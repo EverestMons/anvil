@@ -1,13 +1,13 @@
 # Anvil — Project Status
 
-**Status:** Scorer Complete
+**Status:** Pipeline Complete
 **Last Updated:** 2026-03-30
 
 ---
 
 ## Current Phase
 
-Phase 4 Scorer complete. Ready for Phase 5 (Lab — actionable output generation).
+Full SCAN → EXTRACT → SCORE → LAB pipeline operational. First cycle complete against invoice-pulse.
 
 ## Completed Milestones
 
@@ -16,6 +16,7 @@ Phase 4 Scorer complete. Ready for Phase 5 (Lab — actionable output generation
 - **Phase 2 Scanner** (2026-03-30) — file discovery, SHA-256 change detection, git history ingestion, idempotent rescans. Tested against invoice-pulse: 939 files registered, 479 git commits ingested (2168 per-file change records). QA verified: all 8 areas PASS.
 - **Phase 3 Extractor** (2026-03-30) — Python AST parser, symbol extraction, dependency resolution, MinHash fingerprinting. Live extraction against invoice-pulse: 188 files processed, 3247 chunks created, 34789 symbols extracted, 12142 dependencies resolved, 3247 fingerprints (3031 with MinHash), 381 similarity pairs. QA verified: all 10 areas PASS.
 - **Phase 4 Scorer** (2026-03-30) — 5-dimension health scoring (volatility, coverage, complexity, coupling, staleness), composite scores, test result ingestion. Live scoring against invoice-pulse: 3247 chunks scored, distribution: 29 high-risk, 1413 medium, 1805 low-risk, avg composite 0.26. Top risk: validator gate functions (high volatility + no coverage + high complexity). QA verified: all 9 areas PASS.
+- **Phase 5 Lab** (2026-03-30) — 6 finding types (coverage gaps, coupling hotspots, clone candidates, staleness alerts, complexity hotspots, co-change patterns), Planner constraint generation, specialist update data, cycle report writing. Live Lab against invoice-pulse: 1212 total findings (117 coverage gaps, 17 coupling hotspots, 381 clones, 118 staleness, 76 complexity, 503 co-change), 292 Planner constraints generated. QA verified: all 9 areas PASS.
 
 ## Roadmap
 
@@ -29,4 +30,4 @@ Deposited at `knowledge/decisions/roadmap-anvil-build-2026-03-29.md`.
 
 ## Next
 
-Phase 5 — Lab (actionable output generation: fix executables, constraints for Planner, specialist file updates, CEO alerts).
+Pipeline operational. Next steps: run cycles against additional projects (forge, freight-kb), integrate Planner constraint consumption, Phase 2 language support (JavaScript/TypeScript).
