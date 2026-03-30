@@ -1,13 +1,17 @@
 # Anvil — Project Status
 
-**Status:** Scaffolding
+**Status:** Scaffolded
 **Last Updated:** 2026-03-29
 
 ---
 
 ## Current Phase
 
-Phase 0 in progress. No code yet.
+Phase 0 complete. No code yet. Ready for Phase 1 (Schema).
+
+## Completed Milestones
+
+- **Phase 0 Scaffold** (2026-03-29) — git init, COMPANY.md updated, CLAUDE.md, 3 agent specialist files (SA, Developer, QA), domain glossary, feedback log, requirements.txt. QA verified: all PASS.
 
 ## Roadmap
 
@@ -21,4 +25,4 @@ Deposited at `knowledge/decisions/roadmap-anvil-build-2026-03-29.md`.
 
 ## Next
 
-Agent specialist files (Step 2), then Phase 1 (Schema).
+Phase 1 — Schema design (SA blueprints), then pipeline implementation.
