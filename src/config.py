@@ -1,0 +1,33 @@
+"""
+Anvil configuration — paths, scan targets, and tuning parameters.
+"""
+import os
+
+ANVIL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+ANVIL_DB_PATH = os.path.join(ANVIL_ROOT, "anvil.db")
+
+SCAN_TARGETS = {
+    "invoice-pulse": "/Users/marklehn/Desktop/GitHub/invoice-pulse",
+}
+
+EXCLUDED_DIRS = {
+    ".git",
+    "__pycache__",
+    "node_modules",
+    ".venv",
+    ".vexp",
+    "target",
+    ".tox",
+}
+
+EXCLUDED_EXTENSIONS = {
+    ".pyc",
+    ".pyo",
+    ".so",
+    ".dylib",
+}
+
+MINHASH_NUM_PERM = 128
+MINHASH_THRESHOLD = 0.7
+GIT_HISTORY_WEEKS = 4
