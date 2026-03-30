@@ -26,6 +26,23 @@ EXCLUDED_EXTENSIONS = {
     ".pyo",
     ".so",
     ".dylib",
+    ".db",
+    ".db-shm",
+    ".db-wal",
+    ".pdf",
+    ".docx",
+    ".bak",
+    ".log",
+    ".ico",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
 }
 
 MINHASH_NUM_PERM = 128

@@ -77,7 +77,8 @@ def discover_files(project_path: str, excluded_dirs: set,
     """
     files = []
     for root, dirs, filenames in os.walk(project_path, topdown=True):
-        dirs[:] = [d for d in dirs if d not in excluded_dirs]
+        dirs[:] = [d for d in dirs
+                   if d not in excluded_dirs and not d.startswith(".")]
         for fname in filenames:
             if fname.startswith("."):
                 continue
