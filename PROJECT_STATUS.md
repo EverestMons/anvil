@@ -1,13 +1,13 @@
 # Anvil — Project Status
 
-**Status:** Pipeline Complete
+**Status:** Operational
 **Last Updated:** 2026-03-30
 
 ---
 
 ## Current Phase
 
-Full SCAN → EXTRACT → SCORE → LAB pipeline operational. First cycle complete against invoice-pulse.
+Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated against invoice-pulse. Cross-validated against specialist file facts (10/10 PASS). Findings quality assessed — coverage gaps are highest-value (81% signal), Planner integration protocol defined.
 
 ## Completed Milestones
 
@@ -16,7 +16,8 @@ Full SCAN → EXTRACT → SCORE → LAB pipeline operational. First cycle comple
 - **Phase 2 Scanner** (2026-03-30) — file discovery, SHA-256 change detection, git history ingestion, idempotent rescans. Tested against invoice-pulse: 939 files registered, 479 git commits ingested (2168 per-file change records). QA verified: all 8 areas PASS.
 - **Phase 3 Extractor** (2026-03-30) — Python AST parser, symbol extraction, dependency resolution, MinHash fingerprinting. Live extraction against invoice-pulse: 188 files processed, 3247 chunks created, 34789 symbols extracted, 12142 dependencies resolved, 3247 fingerprints (3031 with MinHash), 381 similarity pairs. QA verified: all 10 areas PASS.
 - **Phase 4 Scorer** (2026-03-30) — 5-dimension health scoring (volatility, coverage, complexity, coupling, staleness), composite scores, test result ingestion. Live scoring against invoice-pulse: 3247 chunks scored, distribution: 29 high-risk, 1413 medium, 1805 low-risk, avg composite 0.26. Top risk: validator gate functions (high volatility + no coverage + high complexity). QA verified: all 9 areas PASS.
-- **Phase 5 Lab** (2026-03-30) — 6 finding types (coverage gaps, coupling hotspots, clone candidates, staleness alerts, complexity hotspots, co-change patterns), Planner constraint generation, specialist update data, cycle report writing. Live Lab against invoice-pulse: 1212 total findings (117 coverage gaps, 17 coupling hotspots, 381 clones, 118 staleness, 76 complexity, 503 co-change), 292 Planner constraints generated. QA verified: all 9 areas PASS.
+- **Phase 5 Lab** (2026-03-30) — 6 finding types (coverage gaps, coupling hotspots, clone candidates, staleness alerts, complexity hotspots, co-change patterns), Planner constraint generation, specialist update data, cycle report writing. Live Lab against invoice-pulse: 1212 total findings, 292 Planner constraints generated. QA verified: all 9 areas PASS.
+- **Phase 6 First Cycle Validation** (2026-03-30) — cycle runner (pipeline orchestrator + cycle comparison), cross-validated against invoice-pulse specialist facts (10/10 PASS: gate functions exact match, confidence staleness detected, clones verified, coverage gaps confirmed). Findings quality assessed: 25% overall signal-to-noise, coverage gaps 81% signal. Planner integration protocol defined.
 
 ## Roadmap
 
@@ -30,4 +31,8 @@ Deposited at `knowledge/decisions/roadmap-anvil-build-2026-03-29.md`.
 
 ## Next
 
-Pipeline operational. Next steps: run cycles against additional projects (forge, freight-kb), integrate Planner constraint consumption, Phase 2 language support (JavaScript/TypeScript).
+- Run `from src.cycle import run_cycle` for on-demand cycles
+- Planner should consume `coverage_required` and `verify_dependents` constraints (high severity only)
+- Tune thresholds per findings quality assessment before Cycle 2
+- Extend to additional projects (forge, freight-kb)
+- Phase 2 language support (JavaScript/TypeScript) when needed
