@@ -48,3 +48,12 @@ EXCLUDED_EXTENSIONS = {
 MINHASH_NUM_PERM = 128
 MINHASH_THRESHOLD = 0.7
 GIT_HISTORY_WEEKS = 4
+
+# Scoring weights (higher score = higher risk)
+SCORING_WEIGHTS = {
+    "volatility": 0.25,
+    "coverage": 0.25,
+    "complexity": 0.20,
+    "coupling": 0.15,
+    "staleness": 0.15,
+}
