@@ -200,6 +200,13 @@ def init_db(conn: sqlite3.Connection) -> None:
     """)
     conn.commit()
 
+    # Migration: add structural_metadata column if not present
+    try:
+        conn.execute("ALTER TABLE code_chunks ADD COLUMN structural_metadata TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
 
 # --- projects ---
 
