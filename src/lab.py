@@ -23,6 +23,7 @@ from src.config import (
     COCHANGE_MIN_COUNT,
     ROLE_THRESHOLDS,
 )
+from src.detector import check_best_practice
 
 
 def run_lab(conn, project_name: str, cycle_id: int) -> dict:
@@ -44,6 +45,7 @@ def run_lab(conn, project_name: str, cycle_id: int) -> dict:
     staleness_alerts = find_staleness_alerts(conn, project_id, cycle_id)
     complexity_hotspots = find_complexity_hotspots(conn, project_id, cycle_id)
     cochange_patterns = find_cochange_patterns(conn, project_id)
+    bp_deviations = find_best_practice_deviations(conn, project_id)
 
     findings = {
         "coverage_gaps": coverage_gaps,
@@ -52,6 +54,7 @@ def run_lab(conn, project_name: str, cycle_id: int) -> dict:
         "staleness_alerts": staleness_alerts,
         "complexity_hotspots": complexity_hotspots,
         "cochange_patterns": cochange_patterns,
+        "best_practice_deviations": bp_deviations,
     }
 
     constraints = generate_planner_constraints(
@@ -274,6 +277,55 @@ def find_cochange_patterns(conn, project_id: int) -> list[dict]:
     return results
 
 
+def find_best_practice_deviations(conn, project_id: int) -> list[dict]:
+    """Find chunks that deviate from best practices for their functional role."""
+    # Get all classified chunks
+    conn.row_factory = db._row_to_dict
+    cur = conn.execute(
+        "SELECT id, file_path, name, content, structural_metadata, functional_role "
+        "FROM code_chunks WHERE project_id = ? AND functional_role IS NOT NULL "
+        "AND chunk_type NOT IN ('module', 'test_case')",
+        (project_id,),
+    )
+    chunks = cur.fetchall()
+    conn.row_factory = None
+
+    # Cache practices by role
+    practices_cache = {}
+    results = []
+
+    for chunk in chunks:
+        role = chunk["functional_role"]
+        if role not in practices_cache:
+            practices_cache[role] = db.get_best_practices_by_role(conn, role)
+
+        for practice in practices_cache[role]:
+            result = check_best_practice(chunk, practice)
+            if not result["compliant"]:
+                results.append({
+                    "chunk_id": chunk["id"],
+                    "file_path": chunk["file_path"],
+                    "name": chunk["name"],
+                    "functional_role": role,
+                    "practice_name": practice["pattern_name"],
+                    "practice_description": practice["description"],
+                    "practice_severity": practice["severity"],
+                    "observation": result["observation"],
+                    "recommendation": (
+                        f'"{chunk["name"]}" is a {role}. '
+                        f'Best practice: {practice["pattern_name"]} -- '
+                        f'{practice["description"]}. '
+                        f'Current: {result["observation"]}.'
+                    ),
+                })
+
+    results.sort(key=lambda x: (
+        {"high": 0, "medium": 1, "low": 2}.get(x["practice_severity"], 1),
+        x["functional_role"],
+    ))
+    return results
+
+
 def generate_planner_constraints(conn, project_name: str, cycle_id: int,
                                  findings: dict) -> list[dict]:
     """Assemble findings into structured Planner constraints."""
@@ -324,6 +376,15 @@ def generate_planner_constraints(conn, project_name: str, cycle_id: int,
                        f"cyclomatic={hotspot['cyclomatic_complexity']}, "
                        f"depth={hotspot['nesting_depth']}"),
             "severity": "medium",
+        })
+
+    for dev in findings.get("best_practice_deviations", [])[:30]:  # Cap at 30
+        constraints.append({
+            "type": "pattern_recommendation",
+            "target": f"{dev['file_path']}::{dev['name']}",
+            "reason": (f"{dev['functional_role']} deviates from "
+                       f"{dev['practice_name']}: {dev['observation']}"),
+            "severity": dev["practice_severity"],
         })
 
     return constraints
@@ -532,6 +593,25 @@ def write_cycle_report(conn, project_name: str, cycle_id: int,
             )
     else:
         lines.append("No co-change patterns found.")
+    lines.append("")
+
+    # Research Recommendations (best practice deviations)
+    bp_devs = findings.get("best_practice_deviations", [])
+    roles_with_devs = defaultdict(list)
+    for d in bp_devs:
+        roles_with_devs[d["functional_role"]].append(d)
+    lines.append(f"## Research Recommendations ({len(bp_devs)} deviations across {len(roles_with_devs)} roles)")
+    if bp_devs:
+        for role in sorted(roles_with_devs.keys()):
+            devs = roles_with_devs[role]
+            lines.append(f"\n### {role} ({len(devs)} deviations)")
+            for d in devs[:15]:
+                lines.append(
+                    f"- **[{d['practice_severity']}]** `{d['file_path']}::{d['name']}` "
+                    f"-- {d['practice_name']}: {d['observation']}"
+                )
+    else:
+        lines.append("No best practice deviations found.")
     lines.append("")
 
     # Planner constraints
