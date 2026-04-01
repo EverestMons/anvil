@@ -1,7 +1,7 @@
 # Anvil — Project Status
 
 **Status:** Operational
-**Last Updated:** 2026-03-30
+**Last Updated:** 2026-04-01
 
 ---
 
@@ -18,6 +18,8 @@ Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated
 - **Phase 4 Scorer** (2026-03-30) — 5-dimension health scoring (volatility, coverage, complexity, coupling, staleness), composite scores, test result ingestion. Live scoring against invoice-pulse: 3247 chunks scored, distribution: 29 high-risk, 1413 medium, 1805 low-risk, avg composite 0.26. Top risk: validator gate functions (high volatility + no coverage + high complexity). QA verified: all 9 areas PASS.
 - **Phase 5 Lab** (2026-03-30) — 6 finding types (coverage gaps, coupling hotspots, clone candidates, staleness alerts, complexity hotspots, co-change patterns), Planner constraint generation, specialist update data, cycle report writing. Live Lab against invoice-pulse: 1212 total findings, 292 Planner constraints generated. QA verified: all 9 areas PASS.
 - **Phase 6 First Cycle Validation** (2026-03-30) — cycle runner (pipeline orchestrator + cycle comparison), cross-validated against invoice-pulse specialist facts (10/10 PASS: gate functions exact match, confidence staleness detected, clones verified, coverage gaps confirmed). Findings quality assessed: 25% overall signal-to-noise, coverage gaps 81% signal. Planner integration protocol defined.
+
+- **Phase 7 Classification + Provenance** (2026-04-01) — Functional role taxonomy (25 roles across 5 groups), heuristic classifier (decorator > naming > file path > fallback rules), dev log parser with provenance ingestion. Pipeline extended: SCAN -> EXTRACT -> CLASSIFY -> PROVENANCE -> SCORE -> LAB. Live results: 1,605 chunks classified (100% coverage, 24 roles assigned), 8,404 provenance entries from 100 dev logs. QA discovered and fixed backtick-wrapping issue in parser. QA verified: all 7 areas PASS.
 
 ## Roadmap
 
