@@ -575,3 +575,41 @@ def write_cycle_report(conn, project_name: str, cycle_id: int,
         findings_count=total_findings,
         report_path=report_path,
     )
+
+
+def research_best_practices(conn, role_name: str) -> dict:
+    """
+    Generate a research prompt for Claude Code to discover new best practices.
+
+    Returns dict with role info, existing practices, and a structured prompt.
+    Not automated — called by Claude Code during Lab sessions.
+    """
+    # Get role description
+    conn.row_factory = db._row_to_dict
+    cur = conn.execute(
+        "SELECT * FROM functional_roles WHERE name = ?", (role_name,)
+    )
+    role = cur.fetchone()
+    conn.row_factory = None
+
+    if not role:
+        return {"error": f"Role not found: {role_name}"}
+
+    existing = db.get_best_practices_by_role(conn, role_name)
+    existing_names = [p["pattern_name"] for p in existing]
+
+    prompt = (
+        f"Research established software engineering best practices for "
+        f"a '{role_name}' ({role['description']}). "
+        f"Current known patterns: {', '.join(existing_names) or 'none'}. "
+        f"Find 2-3 additional patterns not already listed. "
+        f"For each, provide: pattern_name (snake_case), description (1-2 sentences), "
+        f"detection_hint (how to detect violations), severity (low/medium/high)."
+    )
+
+    return {
+        "role_name": role_name,
+        "role_description": role["description"],
+        "existing_practices": existing,
+        "research_prompt": prompt,
+    }
