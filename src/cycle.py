@@ -10,8 +10,11 @@ import time
 from datetime import datetime, timezone
 
 from src import db
+from src.classifier import classify_project
+from src.config import DEV_LOG_PATHS
 from src.scanner import scan_project
 from src.extractor import extract_project
+from src.provenance import ingest_provenance
 from src.scorer import score_project
 from src.lab import run_lab
 
@@ -54,6 +57,24 @@ def run_cycle(conn, project_name: str) -> dict:
         results["extract"] = {"error": str(e)}
         results["elapsed_seconds"] = round(time.time() - start_time, 2)
         return results
+
+    # Stage 2.5: CLASSIFY (non-fatal — scoring works without it)
+    try:
+        classify_result = classify_project(conn, project_name)
+        results["classify"] = classify_result
+    except Exception as e:
+        results["classify"] = {"error": str(e)}
+
+    # Stage 2.5b: PROVENANCE (non-fatal)
+    try:
+        dev_log_dir = DEV_LOG_PATHS.get(project_name)
+        if dev_log_dir:
+            provenance_result = ingest_provenance(
+                conn, project_name, dev_log_dir
+            )
+            results["provenance"] = provenance_result
+    except Exception as e:
+        results["provenance"] = {"error": str(e)}
 
     # Stage 3: SCORE
     try:

@@ -65,3 +65,8 @@ COUPLING_HOTSPOT_THRESHOLD = 0.8
 STALENESS_THRESHOLD = 0.8
 COMPLEXITY_THRESHOLD = 0.8
 COCHANGE_MIN_COUNT = 5
+
+# Dev log paths for provenance ingestion
+DEV_LOG_PATHS = {
+    "invoice-pulse": "/Users/marklehn/Desktop/GitHub/invoice-pulse/knowledge/development/",
+}
