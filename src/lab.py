@@ -21,6 +21,7 @@ from src.config import (
     STALENESS_THRESHOLD,
     COMPLEXITY_THRESHOLD,
     COCHANGE_MIN_COUNT,
+    ROLE_THRESHOLDS,
 )
 
 
@@ -102,20 +103,32 @@ def find_coverage_gaps(conn, project_id: int, cycle_id: int) -> list[dict]:
 
 
 def find_coupling_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
-    """Find highly coupled chunks."""
+    """Find highly coupled chunks, using role-specific thresholds."""
+    min_threshold = min(
+        (rt.get("coupling_hotspot_threshold", COUPLING_HOTSPOT_THRESHOLD)
+         for rt in ROLE_THRESHOLDS.values()),
+        default=COUPLING_HOTSPOT_THRESHOLD,
+    )
     cur = conn.execute(
         "SELECT cc.id, cc.file_path, cc.name, hs.coupling_score, "
-        "hs.composite_score "
+        "hs.composite_score, cc.functional_role "
         "FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND hs.coupling_score >= ? "
         "ORDER BY hs.coupling_score DESC",
-        (cycle_id, COUPLING_HOTSPOT_THRESHOLD),
+        (cycle_id, min_threshold),
     )
     results = []
     for r in cur.fetchall():
+        role = r[5]
+        role_thresh = ROLE_THRESHOLDS.get(role, {})
+        threshold = role_thresh.get(
+            "coupling_hotspot_threshold", COUPLING_HOTSPOT_THRESHOLD
+        )
+        if r[3] < threshold:
+            continue
+
         chunk_id = r[0]
-        # Count inbound/outbound
         in_cur = conn.execute(
             "SELECT COUNT(*) FROM chunk_dependencies WHERE target_chunk_id = ?",
             (chunk_id,),
@@ -180,19 +193,31 @@ def find_staleness_alerts(conn, project_id: int, cycle_id: int) -> list[dict]:
 
 
 def find_complexity_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
-    """Find overly complex functions."""
+    """Find overly complex functions, using role-specific thresholds."""
+    # Pre-filter at minimum possible threshold (0.50 for utility)
+    min_threshold = min(
+        (rt.get("complexity_threshold", COMPLEXITY_THRESHOLD)
+         for rt in ROLE_THRESHOLDS.values()),
+        default=COMPLEXITY_THRESHOLD,
+    )
     cur = conn.execute(
         "SELECT cc.id, cc.file_path, cc.name, cc.structural_metadata, "
-        "hs.complexity_score, hs.composite_score "
+        "hs.complexity_score, hs.composite_score, cc.functional_role "
         "FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND hs.complexity_score >= ? "
         "AND cc.project_id = ? "
         "ORDER BY hs.complexity_score DESC",
-        (cycle_id, COMPLEXITY_THRESHOLD, project_id),
+        (cycle_id, min_threshold, project_id),
     )
     results = []
     for r in cur.fetchall():
+        role = r[6]
+        role_thresh = ROLE_THRESHOLDS.get(role, {})
+        threshold = role_thresh.get("complexity_threshold", COMPLEXITY_THRESHOLD)
+        if r[4] < threshold:
+            continue
+
         meta = {}
         if r[3]:
             try:

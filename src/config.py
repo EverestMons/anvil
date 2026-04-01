@@ -66,6 +66,66 @@ STALENESS_THRESHOLD = 0.8
 COMPLEXITY_THRESHOLD = 0.8
 COCHANGE_MIN_COUNT = 5
 
+# Role-specific scoring weight overrides (roles not listed use SCORING_WEIGHTS)
+ROLE_SCORING_WEIGHTS = {
+    "route_handler": {
+        "volatility": 0.20, "coverage": 0.30, "complexity": 0.25,
+        "coupling": 0.15, "staleness": 0.10,
+    },
+    "validation_gate": {
+        "volatility": 0.15, "coverage": 0.35, "complexity": 0.10,
+        "coupling": 0.15, "staleness": 0.25,
+    },
+    "confidence_engine": {
+        "volatility": 0.20, "coverage": 0.25, "complexity": 0.15,
+        "coupling": 0.20, "staleness": 0.20,
+    },
+    "data_model": {
+        "volatility": 0.30, "coverage": 0.20, "complexity": 0.10,
+        "coupling": 0.25, "staleness": 0.15,
+    },
+    "utility": {
+        "volatility": 0.20, "coverage": 0.20, "complexity": 0.30,
+        "coupling": 0.15, "staleness": 0.15,
+    },
+    "ingestion_orchestrator": {
+        "volatility": 0.20, "coverage": 0.25, "complexity": 0.20,
+        "coupling": 0.20, "staleness": 0.15,
+    },
+    "action_router": {
+        "volatility": 0.20, "coverage": 0.30, "complexity": 0.20,
+        "coupling": 0.15, "staleness": 0.15,
+    },
+    "report_generator": {
+        "volatility": 0.15, "coverage": 0.20, "complexity": 0.25,
+        "coupling": 0.15, "staleness": 0.25,
+    },
+}
+
+# Role-specific threshold overrides (roles not listed use global thresholds)
+ROLE_THRESHOLDS = {
+    "route_handler": {
+        "complexity_threshold": 0.60,
+        "coupling_hotspot_threshold": 0.80,
+    },
+    "validation_gate": {
+        "complexity_threshold": 0.95,
+        "coupling_hotspot_threshold": 0.80,
+    },
+    "confidence_engine": {
+        "complexity_threshold": 0.85,
+        "coupling_hotspot_threshold": 0.70,
+    },
+    "data_model": {
+        "complexity_threshold": 0.90,
+        "coupling_hotspot_threshold": 0.90,
+    },
+    "utility": {
+        "complexity_threshold": 0.50,
+        "coupling_hotspot_threshold": 0.80,
+    },
+}
+
 # Dev log paths for provenance ingestion
 DEV_LOG_PATHS = {
     "invoice-pulse": "/Users/marklehn/Desktop/GitHub/invoice-pulse/knowledge/development/",

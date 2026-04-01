@@ -13,7 +13,9 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from src import db
-from src.config import GIT_HISTORY_WEEKS, SCAN_TARGETS, SCORING_WEIGHTS
+from src.config import (
+    GIT_HISTORY_WEEKS, SCAN_TARGETS, SCORING_WEIGHTS, ROLE_SCORING_WEIGHTS,
+)
 
 
 def score_project(conn, project_name: str, cycle_id: int) -> dict:
@@ -102,9 +104,12 @@ def score_project(conn, project_name: str, cycle_id: int) -> dict:
         coup_score = coup_ranks.get(entry["coupling_raw"], 0.5)
         stale_score = entry["staleness"]
 
+        role = chunk.get("functional_role")
+        weights = ROLE_SCORING_WEIGHTS.get(role, SCORING_WEIGHTS)
+
         composite = compute_composite(
             vol_score, cov_score, comp_score, coup_score, stale_score,
-            SCORING_WEIGHTS,
+            weights,
         )
 
         db.create_health_score(
