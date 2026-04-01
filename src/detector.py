@@ -28,7 +28,8 @@ CONTENT_CHECKS = {
          "message": "File I/O found in utility function"},
     ],
     "no_domain_logic": [
-        {"pattern": re.compile(r"\b(invoice|contract|carrier|validation)\b", re.IGNORECASE),
+        {"pattern": re.compile(r"(?:^|[\s_.])(invoice|contract|carrier|validation)(?:[\s_.]|$)",
+                               re.IGNORECASE | re.MULTILINE),
          "message": "Domain-specific term found in utility function"},
     ],
     "deterministic_output": [
