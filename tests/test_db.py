@@ -63,6 +63,7 @@ def chunk_id(conn, project_id):
 # --- Schema creation ---
 
 EXPECTED_TABLES = [
+    "best_practices",
     "chunk_dependencies",
     "chunk_fingerprints",
     "chunk_provenance",
@@ -144,6 +145,10 @@ EXPECTED_INDEXES = {
     "chunk_provenance": [
         "idx_chunk_provenance_chunk",
         "idx_chunk_provenance_plan",
+    ],
+    "best_practices": [
+        "idx_best_practices_role",
+        "idx_best_practices_role_pattern",
     ],
 }
 

@@ -221,6 +221,24 @@ def init_db(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_chunk_provenance_plan
             ON chunk_provenance(plan_name);
+
+        CREATE TABLE IF NOT EXISTS best_practices (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            functional_role TEXT    NOT NULL,
+            pattern_name    TEXT    NOT NULL,
+            description     TEXT    NOT NULL,
+            detection_hint  TEXT,
+            source          TEXT    NOT NULL DEFAULT 'curated',
+            severity        TEXT    NOT NULL DEFAULT 'medium'
+                            CHECK (severity IN ('low', 'medium', 'high')),
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_best_practices_role
+            ON best_practices(functional_role);
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_best_practices_role_pattern
+            ON best_practices(functional_role, pattern_name);
     """)
     conn.commit()
 
@@ -239,6 +257,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         pass  # Column already exists
 
     _seed_functional_roles(conn)
+    _seed_best_practices(conn)
 
 
 # --- projects ---
@@ -566,6 +585,118 @@ def get_provenance_by_chunk(conn: sqlite3.Connection,
     cur = conn.execute(
         "SELECT * FROM chunk_provenance WHERE chunk_id = ? ORDER BY id",
         (chunk_id,),
+    )
+    rows = cur.fetchall()
+    conn.row_factory = None
+    return rows
+
+
+# --- best_practices ---
+
+BEST_PRACTICE_SEEDS = [
+    # route_handler
+    ("route_handler", "single_responsibility",
+     "Each route function handles one concern without multi-step orchestration inline",
+     "Function length > 80 lines or multiple DB write operations in one route",
+     "curated", "medium"),
+    ("route_handler", "input_validation_at_boundary",
+     "All form/query params validated before DB operations with type coercion",
+     "Missing type coercion on request.form values; raw request.form[] access",
+     "curated", "high"),
+    ("route_handler", "consistent_error_handling",
+     "Flash messages for user errors, proper HTTP status codes, no bare except clauses",
+     "Bare except: blocks; missing flash() on validation failure; 200 status on error",
+     "curated", "medium"),
+    # confidence_engine
+    ("confidence_engine", "immutable_state_transitions",
+     "All state transitions go through ALLOWED_TRANSITIONS check; no direct state assignment",
+     "State column UPDATE without calling transition validation function",
+     "curated", "high"),
+    ("confidence_engine", "append_only_audit",
+     "Every state change writes to confidence_log; no updates or deletes on log table",
+     "UPDATE or DELETE on confidence_log table; missing log entry after state change",
+     "curated", "high"),
+    ("confidence_engine", "threshold_gated_automation",
+     "Automated actions require minimum invoice count threshold before triggering",
+     "Automation logic without checking min_invoices or sample_size threshold",
+     "curated", "high"),
+    # validation_gate
+    ("validation_gate", "structured_return_type",
+     "Every gate returns a GateResult dataclass with pass/fail, reason, and enrichment data",
+     "Functions returning bool, tuple, or dict instead of GateResult",
+     "curated", "high"),
+    ("validation_gate", "error_accumulation",
+     "Gates collect all failures within scope rather than short-circuiting on first error",
+     "Early return on first failure within a single gate function",
+     "curated", "medium"),
+    ("validation_gate", "deterministic_output",
+     "Same inputs produce same GateResult; no external API calls or datetime in comparisons",
+     "External HTTP calls; datetime.now() used in value comparison; random module usage",
+     "curated", "medium"),
+    # utility
+    ("utility", "pure_functions",
+     "No side effects, no DB access, no file I/O; pure data transformation only",
+     "Functions with conn parameter; file open() calls; global state mutation",
+     "curated", "medium"),
+    ("utility", "explicit_null_handling",
+     "Return typed defaults rather than None; document nullable return values with type hints",
+     "Bare return None without Optional type hint; undocumented None returns",
+     "curated", "low"),
+    ("utility", "no_domain_logic",
+     "Helpers should be domain-agnostic; domain-specific logic belongs in its role module",
+     "References to invoice, contract, carrier, or validation in utility functions",
+     "curated", "medium"),
+    # data_model
+    ("data_model", "idempotent_schema",
+     "All CREATE TABLE use IF NOT EXISTS; ALTER TABLE wrapped in try/except",
+     "Missing IF NOT EXISTS; bare ALTER TABLE without error handling",
+     "curated", "high"),
+    ("data_model", "foreign_key_enforcement",
+     "All cross-table references use REFERENCES with explicit ON DELETE policy",
+     "Integer columns referencing other tables without FK constraint",
+     "curated", "medium"),
+    ("data_model", "migration_isolation",
+     "Each migration in its own function with clear naming (_migrate_X_schema)",
+     "Multiple unrelated ALTER TABLE in one function; unnamed migration logic",
+     "curated", "medium"),
+]
+
+
+def _seed_best_practices(conn: sqlite3.Connection) -> None:
+    """Seed best_practices table with 15 initial patterns."""
+    for role, pattern, desc, hint, source, severity in BEST_PRACTICE_SEEDS:
+        conn.execute(
+            "INSERT OR IGNORE INTO best_practices "
+            "(functional_role, pattern_name, description, detection_hint, source, severity) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (role, pattern, desc, hint, source, severity),
+        )
+    conn.commit()
+
+
+def create_best_practice(conn: sqlite3.Connection, functional_role: str,
+                         pattern_name: str, description: str,
+                         detection_hint: Optional[str] = None,
+                         source: str = "web_research",
+                         severity: str = "medium") -> int:
+    """Insert a new best practice. Returns the new row ID."""
+    cur = conn.execute(
+        "INSERT INTO best_practices "
+        "(functional_role, pattern_name, description, detection_hint, source, severity) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (functional_role, pattern_name, description, detection_hint, source, severity),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_best_practices_by_role(conn: sqlite3.Connection,
+                               role: str) -> list[dict]:
+    """Retrieve all best practices for a functional role."""
+    conn.row_factory = _row_to_dict
+    cur = conn.execute(
+        "SELECT * FROM best_practices WHERE functional_role = ? ORDER BY severity DESC, id",
+        (role,),
     )
     rows = cur.fetchall()
     conn.row_factory = None
