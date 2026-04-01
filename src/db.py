@@ -197,6 +197,30 @@ def init_db(conn: sqlite3.Connection) -> None:
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_cycle_reports_project_cycle
             ON cycle_reports(project_id, cycle_number);
+
+        CREATE TABLE IF NOT EXISTS functional_roles (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            name            TEXT    NOT NULL UNIQUE,
+            description     TEXT,
+            parent_role     TEXT,
+            scoring_weights TEXT,
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS chunk_provenance (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            chunk_id        INTEGER NOT NULL REFERENCES code_chunks(id) ON DELETE CASCADE,
+            plan_name       TEXT    NOT NULL,
+            dev_log_path    TEXT,
+            plan_description TEXT,
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_chunk_provenance_chunk
+            ON chunk_provenance(chunk_id);
+
+        CREATE INDEX IF NOT EXISTS idx_chunk_provenance_plan
+            ON chunk_provenance(plan_name);
     """)
     conn.commit()
 
@@ -206,6 +230,15 @@ def init_db(conn: sqlite3.Connection) -> None:
         conn.commit()
     except sqlite3.OperationalError:
         pass  # Column already exists
+
+    # Migration: add functional_role column if not present
+    try:
+        conn.execute("ALTER TABLE code_chunks ADD COLUMN functional_role TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    _seed_functional_roles(conn)
 
 
 # --- projects ---
@@ -453,3 +486,87 @@ def get_cycle_report(conn: sqlite3.Connection, cycle_number: int) -> Optional[di
     row = cur.fetchone()
     conn.row_factory = None
     return row
+
+
+# --- functional_roles ---
+
+FUNCTIONAL_ROLE_SEEDS = [
+    # Web Layer
+    ("route_handler", "Flask blueprint route functions handling HTTP requests", "web_layer"),
+    ("report_generator", "Analytics dashboards and Excel export routes", "web_layer"),
+    ("document_manager", "Contract document hierarchy CRUD routes", "web_layer"),
+    # Validation Pipeline
+    ("validation_gate", "Sequential invoice validation gates returning GateResult", "validation_pipeline"),
+    ("validation_orchestrator", "Runs gates in sequence and aggregates results", "validation_pipeline"),
+    ("batch_validator", "Concurrent multi-invoice validation with caching", "validation_pipeline"),
+    ("action_router", "Maps validation failures to action queue items", "validation_pipeline"),
+    ("content_generator", "Text generation for dispute emails and tickets", "validation_pipeline"),
+    # Intelligence Layer
+    ("confidence_engine", "State machine for contract element confidence lifecycle", "intelligence_layer"),
+    ("anomaly_detector", "Drift detection between paid data and contract terms", "intelligence_layer"),
+    ("pattern_learner", "Discovers new contract terms from paid invoice patterns", "intelligence_layer"),
+    ("circuit_breaker", "Contradiction spike detection to prevent feedback loops", "intelligence_layer"),
+    ("exit_interviewer", "PRO resolution capture and pattern logging", "intelligence_layer"),
+    # Data Layer
+    ("ingestion_orchestrator", "Full CSV/XML ingestion pipeline orchestration", "data_layer"),
+    ("data_parser", "XML/CSV parsing and format conversion", "data_layer"),
+    ("data_model", "SQLite schema definitions and migrations", "data_layer"),
+    ("lifecycle_tracker", "Invoice status transition detection and logging", "data_layer"),
+    ("entity_matcher", "Carrier identity detection via fuzzy matching", "data_layer"),
+    ("address_normalizer", "Bill-to normalization and fuzzy matching", "data_layer"),
+    # Infrastructure
+    ("pipeline_orchestrator", "Daily execution sequence coordinator", "infrastructure"),
+    ("data_guardian", "Backup and integrity verification", "infrastructure"),
+    ("email_processor", "PST import and email-to-invoice matching", "infrastructure"),
+    ("configuration", "Centralized settings and constants", "infrastructure"),
+    ("audit_logger", "Append-only event logging", "infrastructure"),
+    ("utility", "Generic helpers with no domain logic", "infrastructure"),
+]
+
+
+def _seed_functional_roles(conn: sqlite3.Connection) -> None:
+    """Seed functional_roles table with the 25-role taxonomy."""
+    for name, description, parent_role in FUNCTIONAL_ROLE_SEEDS:
+        conn.execute(
+            "INSERT OR IGNORE INTO functional_roles (name, description, parent_role) "
+            "VALUES (?, ?, ?)",
+            (name, description, parent_role),
+        )
+    conn.commit()
+
+
+def get_functional_roles(conn: sqlite3.Connection) -> list[dict]:
+    """Retrieve all functional roles."""
+    conn.row_factory = _row_to_dict
+    cur = conn.execute("SELECT * FROM functional_roles ORDER BY parent_role, name")
+    rows = cur.fetchall()
+    conn.row_factory = None
+    return rows
+
+
+# --- chunk_provenance ---
+
+def create_provenance(conn: sqlite3.Connection, chunk_id: int,
+                      plan_name: str, dev_log_path: Optional[str] = None,
+                      plan_description: Optional[str] = None) -> int:
+    """Insert a provenance entry. Returns the new row ID."""
+    cur = conn.execute(
+        "INSERT INTO chunk_provenance (chunk_id, plan_name, dev_log_path, "
+        "plan_description) VALUES (?, ?, ?, ?)",
+        (chunk_id, plan_name, dev_log_path, plan_description),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_provenance_by_chunk(conn: sqlite3.Connection,
+                            chunk_id: int) -> list[dict]:
+    """Retrieve all provenance entries for a chunk."""
+    conn.row_factory = _row_to_dict
+    cur = conn.execute(
+        "SELECT * FROM chunk_provenance WHERE chunk_id = ? ORDER BY id",
+        (chunk_id,),
+    )
+    rows = cur.fetchall()
+    conn.row_factory = None
+    return rows

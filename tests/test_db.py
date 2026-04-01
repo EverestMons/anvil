@@ -65,10 +65,12 @@ def chunk_id(conn, project_id):
 EXPECTED_TABLES = [
     "chunk_dependencies",
     "chunk_fingerprints",
+    "chunk_provenance",
     "chunk_similarities",
     "chunk_symbol_bindings",
     "code_chunks",
     "cycle_reports",
+    "functional_roles",
     "git_changes",
     "health_scores",
     "projects",
@@ -138,6 +140,10 @@ EXPECTED_INDEXES = {
     "cycle_reports": [
         "idx_cycle_reports_project",
         "idx_cycle_reports_project_cycle",
+    ],
+    "chunk_provenance": [
+        "idx_chunk_provenance_chunk",
+        "idx_chunk_provenance_plan",
     ],
 }
 
