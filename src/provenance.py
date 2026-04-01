@@ -23,11 +23,12 @@ HEADER_PATTERNS = [
 ]
 
 # Entry extraction patterns
+# Bullet format: handles both bare paths and backtick-wrapped paths
 BULLET_PATTERN = re.compile(
-    r"^-\s+([a-zA-Z0-9_./-]+\.\w+)\s*(?:--|—)\s*(.*)$"
+    r"^-\s+`?([a-zA-Z0-9_./-]+\.\w+)`?\s*(?:--|—)\s*(.*)$"
 )
 TABLE_ROW_PATTERN = re.compile(
-    r"^\|\s*([a-zA-Z0-9_./-]+\.\w+)\s*\|"
+    r"^\|\s*`?([a-zA-Z0-9_./-]+\.\w+)`?\s*\|"
 )
 
 

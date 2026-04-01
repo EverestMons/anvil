@@ -163,6 +163,17 @@ def test_extract_emdash_format():
     assert paths[0]["path"] == "web/contracts.py"
 
 
+def test_extract_backtick_wrapped_paths():
+    content = """### Files Created or Modified (Code)
+- `web/action_queue.py` \u2014 added /acknowledge route
+- `engines/action_router.py` -- disabled RECORD_RESOLUTION creation
+"""
+    paths = _extract_file_paths(content)
+    assert len(paths) == 2
+    assert paths[0]["path"] == "web/action_queue.py"
+    assert paths[1]["path"] == "engines/action_router.py"
+
+
 # --- parse_dev_logs ---
 
 def test_parse_dev_logs(dev_log_dir):
