@@ -190,6 +190,21 @@ def _find_existing_chunk(conn, project_id: int, file_path: str,
     return row
 
 
+def _find_production_chunk(conn, project_id: int,
+                           callee_name: str) -> Optional[dict]:
+    """Find a production chunk by name, excluding test files."""
+    conn.row_factory = db._row_to_dict
+    cur = conn.execute(
+        "SELECT * FROM code_chunks WHERE project_id = ? AND name = ? "
+        "AND chunk_type IN ('function', 'method', 'class') "
+        "AND file_path NOT LIKE 'tests/%'",
+        (project_id, callee_name),
+    )
+    row = cur.fetchone()
+    conn.row_factory = None
+    return row
+
+
 def _update_chunk(conn, chunk_id: int, chunk_dict: dict,
                   parent_chunk_id: Optional[int]) -> None:
     """Update an existing chunk with new content."""
@@ -247,9 +262,10 @@ def _store_file_symbols(conn, project_id: int, module_chunk: dict,
             db.create_symbol_binding(conn, chunk["id"], defn["name"], "defines")
             count += 1
 
-    # Store calls on caller chunks
+    # Store calls on caller chunks + function-level test bindings
     for call in symbols["calls"]:
         caller_name = call["caller"]
+        caller_chunk_type = None
         if caller_name == "<module>":
             chunk_id = module_chunk["id"]
         else:
@@ -268,9 +284,31 @@ def _store_file_symbols(conn, project_id: int, module_chunk: dict,
                     caller_name, "test_case",
                 )
             chunk_id = chunk["id"] if chunk else module_chunk["id"]
+            if chunk:
+                caller_chunk_type = chunk["chunk_type"]
 
         db.create_symbol_binding(conn, chunk_id, call["callee"], "calls")
         count += 1
+
+        # Function-level test binding: when a test_case calls a production
+        # function, create a "tests" binding with target_chunk_id populated
+        if caller_chunk_type == "test_case":
+            target = _find_production_chunk(
+                conn, project_id, call["callee"]
+            )
+            if target:
+                dup = conn.execute(
+                    "SELECT COUNT(*) FROM chunk_symbol_bindings "
+                    "WHERE chunk_id = ? AND binding_type = 'tests' "
+                    "AND target_chunk_id = ?",
+                    (chunk_id, target["id"]),
+                ).fetchone()[0]
+                if dup == 0:
+                    db.create_symbol_binding(
+                        conn, chunk_id, target["name"], "tests",
+                        target_chunk_id=target["id"],
+                    )
+                    count += 1
 
     # Store test mappings
     for tm in symbols["test_mappings"]:

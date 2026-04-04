@@ -18,6 +18,8 @@ from src.extractor import (
     resolve_dependencies,
     compute_fingerprints,
     store_structural_metadata,
+    _store_file_symbols,
+    _find_production_chunk,
 )
 from src.config import SCAN_TARGETS
 
@@ -335,3 +337,141 @@ def test_extract_project_idempotent(conn, mock_project):
     r2 = extract_project(conn, "mock-project", 2)
     assert r2["chunks_created"] == 0  # All exist with same hash
     assert r2["chunks_updated"] == 0
+
+
+# --- function-level test bindings ---
+
+def test_test_case_gets_function_level_tests_binding(conn, mock_project):
+    """test_case calling a production function gets a 'tests' binding with target_chunk_id."""
+    pid, _ = mock_project
+    extract_project(conn, "mock-project", 1)
+
+    # test_helper_add calls helper() from utils.py
+    cur = conn.execute(
+        "SELECT id FROM code_chunks WHERE project_id = ? "
+        "AND name = 'test_helper_add' AND chunk_type = 'test_case'",
+        (pid,),
+    )
+    test_chunk_id = cur.fetchone()[0]
+
+    # helper is in utils.py (production)
+    cur = conn.execute(
+        "SELECT id FROM code_chunks WHERE project_id = ? "
+        "AND name = 'helper' AND chunk_type = 'function' "
+        "AND file_path = 'utils.py'",
+        (pid,),
+    )
+    prod_chunk_id = cur.fetchone()[0]
+
+    # Should have a "tests" binding with target_chunk_id pointing to helper
+    cur = conn.execute(
+        "SELECT target_chunk_id, symbol_name FROM chunk_symbol_bindings "
+        "WHERE chunk_id = ? AND binding_type = 'tests' AND target_chunk_id = ?",
+        (test_chunk_id, prod_chunk_id),
+    )
+    row = cur.fetchone()
+    assert row is not None, "Expected function-level 'tests' binding with target_chunk_id"
+    assert row[0] == prod_chunk_id
+    assert row[1] == "helper"
+
+
+def test_test_helper_does_not_get_tests_binding(conn):
+    """A helper function (chunk_type='function') in a test file should NOT get 'tests' bindings."""
+    init_db(conn)
+    pid = create_project(conn, "helper-test", "/tmp/ht")
+
+    # Production chunk
+    prod_id = create_chunk(
+        conn, project_id=pid, file_path="utils.py", chunk_type="function",
+        name="do_work", content="def do_work(): pass", content_hash="hp1",
+        start_line=1, end_line=1,
+    )
+
+    # Test helper (chunk_type='function', not 'test_case')
+    helper_id = create_chunk(
+        conn, project_id=pid, file_path="tests/test_utils.py", chunk_type="function",
+        name="_setup_data", content="def _setup_data(): do_work()", content_hash="hh1",
+        start_line=1, end_line=1,
+    )
+
+    # Module chunk for the test file
+    mod_id = create_chunk(
+        conn, project_id=pid, file_path="tests/test_utils.py", chunk_type="module",
+        name="tests/test_utils.py", content="", content_hash="hm1",
+        start_line=1, end_line=1,
+    )
+
+    # Simulate symbols: helper calls do_work
+    symbols = {
+        "imports": [],
+        "definitions": [{"name": "_setup_data", "type": "function", "line": 1}],
+        "calls": [{"caller": "_setup_data", "callee": "do_work", "line": 1}],
+        "test_mappings": [],
+    }
+    module_chunk = {"id": mod_id, "file_path": "tests/test_utils.py"}
+    _store_file_symbols(conn, pid, module_chunk, symbols)
+
+    # Should NOT have a "tests" binding (caller is function, not test_case)
+    cur = conn.execute(
+        "SELECT COUNT(*) FROM chunk_symbol_bindings "
+        "WHERE chunk_id = ? AND binding_type = 'tests'",
+        (helper_id,),
+    )
+    assert cur.fetchone()[0] == 0
+
+
+def test_framework_calls_no_spurious_tests_binding(conn):
+    """Calls to framework methods (execute, commit) that don't resolve to production chunks
+    should not create 'tests' bindings."""
+    init_db(conn)
+    pid = create_project(conn, "fw-test", "/tmp/fw")
+
+    # Test case chunk that calls framework methods
+    tc_id = create_chunk(
+        conn, project_id=pid, file_path="tests/test_db.py", chunk_type="test_case",
+        name="test_insert", content="def test_insert(): db.execute('SELECT 1')",
+        content_hash="htc1", start_line=1, end_line=1,
+    )
+    mod_id = create_chunk(
+        conn, project_id=pid, file_path="tests/test_db.py", chunk_type="module",
+        name="tests/test_db.py", content="", content_hash="hmod1",
+        start_line=1, end_line=1,
+    )
+
+    symbols = {
+        "imports": [],
+        "definitions": [{"name": "test_insert", "type": "function", "line": 1}],
+        "calls": [
+            {"caller": "test_insert", "callee": "execute", "line": 1},
+            {"caller": "test_insert", "callee": "commit", "line": 1},
+        ],
+        "test_mappings": [],
+    }
+    module_chunk = {"id": mod_id, "file_path": "tests/test_db.py"}
+    _store_file_symbols(conn, pid, module_chunk, symbols)
+
+    # No production chunks named "execute" or "commit" exist, so no "tests" bindings
+    cur = conn.execute(
+        "SELECT COUNT(*) FROM chunk_symbol_bindings "
+        "WHERE chunk_id = ? AND binding_type = 'tests' AND target_chunk_id IS NOT NULL",
+        (tc_id,),
+    )
+    assert cur.fetchone()[0] == 0
+
+
+def test_module_level_tests_bindings_still_created(conn, mock_project):
+    """Existing module-level 'tests' bindings (filename convention) still work."""
+    pid, _ = mock_project
+    extract_project(conn, "mock-project", 1)
+
+    # test_utils.py should still produce module-level "tests" bindings
+    # with symbol_name = "utils" (from filename convention)
+    cur = conn.execute(
+        "SELECT COUNT(*) FROM chunk_symbol_bindings csb "
+        "JOIN code_chunks cc ON csb.chunk_id = cc.id "
+        "WHERE cc.project_id = ? AND csb.binding_type = 'tests' "
+        "AND csb.symbol_name = 'utils' AND csb.target_chunk_id IS NULL",
+        (pid,),
+    )
+    count = cur.fetchone()[0]
+    assert count >= 1, "Module-level 'tests' bindings should still be created"
