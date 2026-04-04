@@ -23,6 +23,10 @@ Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated
 - **Phase 8 Best Practices + Purpose-Aware Scoring** (2026-04-01) — best_practices table with 15 seed patterns (3 per top 5 roles), role-specific scoring weights for 8 roles, purpose-relative thresholds for 5 roles. Scorer uses role weights, Lab uses role thresholds. Web research hook for Claude Code to discover new practices. Live results: scoring distribution shifted (46 high-risk, 145 complexity hotspots with lower role thresholds). QA verified: all 6 areas PASS.
 - **Phase 7 Classification + Provenance** (2026-04-01) — Functional role taxonomy (25 roles across 5 groups), heuristic classifier (decorator > naming > file path > fallback rules), dev log parser with provenance ingestion. Pipeline extended: SCAN -> EXTRACT -> CLASSIFY -> PROVENANCE -> SCORE -> LAB. Live results: 1,605 chunks classified (100% coverage, 24 roles assigned), 8,404 provenance entries from 100 dev logs. QA discovered and fixed backtick-wrapping issue in parser. QA verified: all 7 areas PASS.
 
+## Diagnostics Completed
+
+- **Pytest Symbol Binding Gap** (2026-04-04) — Investigated full pipeline path from test file extraction through coverage scoring. Found 99.5% of production chunks scored as zero test coverage due to module-level-only "tests" bindings and never-populated target_chunk_id. Fix validated: enhance `_store_file_symbols()` to create function-targeted "tests" bindings when test_case calls resolve to production chunks. Findings at `knowledge/research/pytest-bindings-diagnostic-2026-04-04.md`.
+
 ## Roadmap
 
 Deposited at `knowledge/decisions/roadmap-anvil-build-2026-03-29.md`.
