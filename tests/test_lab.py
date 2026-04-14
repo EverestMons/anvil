@@ -20,6 +20,8 @@ from src.lab import (
     find_cochange_patterns,
     find_staleness_alerts,
     find_complexity_hotspots,
+    find_intent_gaps,
+    write_intent_audit,
     generate_planner_constraints,
     write_cycle_report,
     generate_specialist_update_data,
@@ -293,3 +295,52 @@ def test_run_lab_end_to_end(conn, lab_project, tmp_path, monkeypatch):
 def test_run_lab_unknown_project(conn):
     with pytest.raises(ValueError):
         run_lab(conn, "nonexistent", 1)
+
+
+# --- find_intent_gaps ---
+
+REQUIRED_INTENT_KEYS = {
+    "finding_type", "severity", "title", "what",
+    "why_it_matters", "what_needs_discovering",
+    "success_looks_like", "diagnostic_type", "chunk_ids",
+}
+
+
+def test_find_intent_gaps_missing_brief(conn, tmp_path):
+    """Returns empty list when PROJECT_BRIEF.md is absent."""
+    result = find_intent_gaps(conn, "no-such-project", str(tmp_path), top_n=5)
+    assert result == []
+
+
+def test_find_intent_gaps_returns_required_keys(conn, tmp_path):
+    """Returns dicts with all required keys when minimal data exists."""
+    # Write PROJECT_BRIEF and domain-glossary
+    (tmp_path / "PROJECT_BRIEF.md").write_text("Test project brief.")
+    glossary_dir = tmp_path / "knowledge" / "research"
+    glossary_dir.mkdir(parents=True)
+    (glossary_dir / "domain-glossary.md").write_text("# Glossary\n")
+
+    # Create project and a coverage-gap chunk in the in-memory DB
+    pid = create_project(conn, "intent-test", str(tmp_path))
+    chunk_id = create_chunk(
+        conn, project_id=pid, file_path="src/foo.py", chunk_type="function",
+        name="do_thing", content="def do_thing(): pass",
+        content_hash="abc123", start_line=1, end_line=3,
+    )
+    create_health_score(
+        conn, chunk_id, cycle_id=1,
+        composite_score=0.80, coverage_score=0.90,
+        volatility_score=0.85, coupling_score=0.50,
+        complexity_score=0.40, staleness_score=0.30,
+    )
+
+    result = find_intent_gaps(conn, "intent-test", str(tmp_path), top_n=5)
+
+    assert isinstance(result, list)
+    assert len(result) > 0
+    for finding in result:
+        missing = REQUIRED_INTENT_KEYS - finding.keys()
+        assert not missing, f"Missing keys: {missing}"
+        assert isinstance(finding["chunk_ids"], list)
+        assert finding["finding_type"] == "intent_gap"
+        assert finding["severity"] in ("CRITICAL", "HIGH", "MEDIUM", "LOW")

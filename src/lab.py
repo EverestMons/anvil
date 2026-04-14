@@ -8,6 +8,7 @@ Planner constraints, specialist update data, and cycle reports.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -47,6 +48,14 @@ def run_lab(conn, project_name: str, cycle_id: int) -> dict:
     cochange_patterns = find_cochange_patterns(conn, project_id)
     bp_deviations = find_best_practice_deviations(conn, project_id)
 
+    # Phase 2.1 — Intent gaps
+    project_path = project.get("path", "")
+    intent_gaps = []
+    if project_path:
+        intent_gaps = find_intent_gaps(conn, project_name, project_path, top_n=20)
+        if intent_gaps:
+            write_intent_audit(intent_gaps, project_path, project_name)
+
     findings = {
         "coverage_gaps": coverage_gaps,
         "coupling_hotspots": coupling_hotspots,
@@ -55,6 +64,7 @@ def run_lab(conn, project_name: str, cycle_id: int) -> dict:
         "complexity_hotspots": complexity_hotspots,
         "cochange_patterns": cochange_patterns,
         "best_practice_deviations": bp_deviations,
+        "intent_gaps": intent_gaps,
     }
 
     constraints = generate_planner_constraints(
@@ -324,6 +334,275 @@ def find_best_practice_deviations(conn, project_id: int) -> list[dict]:
         x["functional_role"],
     ))
     return results
+
+
+def _severity_from_composite(score: float) -> str:
+    if score >= 0.75:
+        return "CRITICAL"
+    if score >= 0.60:
+        return "HIGH"
+    if score >= 0.45:
+        return "MEDIUM"
+    return "LOW"
+
+
+def find_intent_gaps(conn, project_name: str, project_path: str,
+                     top_n: int = 20) -> list[dict]:
+    """
+    Phase 2.1 — Cross-reference structural signals against project intent.
+
+    Reads PROJECT_BRIEF.md and domain-glossary.md from the target project,
+    queries the DB for top structural signals (coverage gaps, coupling hotspots,
+    complexity hotspots), and assembles a list of context-rich finding dicts.
+    Returns empty list if either intent file is missing or no health data exists.
+    Does NOT make LLM calls — assembles context packages for Claude Code review.
+    """
+    brief_path = os.path.join(project_path, "PROJECT_BRIEF.md")
+    glossary_path = os.path.join(project_path, "knowledge", "research", "domain-glossary.md")
+
+    if not os.path.isfile(brief_path):
+        logging.warning("find_intent_gaps: PROJECT_BRIEF.md not found at %s", brief_path)
+        return []
+    if not os.path.isfile(glossary_path):
+        logging.warning("find_intent_gaps: domain-glossary.md not found at %s", glossary_path)
+        return []
+
+    with open(brief_path) as f:
+        brief_text = f.read()
+    with open(glossary_path) as f:
+        glossary_text = f.read()
+
+    project = db.get_project(conn, project_name)
+    if project is None:
+        logging.warning("find_intent_gaps: project not found: %s", project_name)
+        return []
+    project_id = project["id"]
+
+    cur = conn.execute(
+        "SELECT MAX(hs.cycle_id) FROM health_scores hs "
+        "JOIN code_chunks cc ON hs.chunk_id = cc.id "
+        "WHERE cc.project_id = ?",
+        (project_id,),
+    )
+    latest_cycle_id = cur.fetchone()[0]
+    if latest_cycle_id is None:
+        logging.warning("find_intent_gaps: no health_scores for project %s", project_name)
+        return []
+
+    n_coverage = top_n // 3
+    n_coupling = top_n // 3
+    n_complexity = top_n - n_coverage - n_coupling
+
+    findings = []
+
+    # Coverage gaps: highest volatility + zero coverage
+    cur = conn.execute(
+        "SELECT cc.id, cc.name, cc.file_path, cc.chunk_type, cc.functional_role, "
+        "hs.composite_score, hs.volatility_score, hs.coverage_score "
+        "FROM health_scores hs "
+        "JOIN code_chunks cc ON hs.chunk_id = cc.id "
+        "WHERE hs.cycle_id = ? AND cc.project_id = ? "
+        "AND hs.coverage_score >= 0.8 AND cc.chunk_type != 'test_case' "
+        "ORDER BY hs.volatility_score DESC, hs.composite_score DESC "
+        "LIMIT ?",
+        (latest_cycle_id, project_id, n_coverage),
+    )
+    for row in cur.fetchall():
+        chunk_id, name, file_path, chunk_type, functional_role, composite_score, volatility_score, coverage_score = row
+        findings.append({
+            "finding_type": "intent_gap",
+            "severity": _severity_from_composite(composite_score),
+            "title": f"{name} ({file_path}) — uncovered high-volatility {chunk_type}",
+            "what": (
+                f"Function `{name}` in `{file_path}` has zero test coverage "
+                f"(coverage_score={coverage_score:.2f}) and a volatility score of "
+                f"{volatility_score:.2f}, indicating frequent change with no test safety net. "
+                f"Functional role: {functional_role or 'unclassified'}."
+            ),
+            "why_it_matters": (
+                f"High-volatility, untested code is the highest-risk class of finding. "
+                f"Changes to `{name}` could introduce regressions with no test signal. "
+                f"Composite score: {composite_score:.2f}."
+            ),
+            "what_needs_discovering": (
+                f"Does `{name}` perform logic critical to the project's core goals "
+                f"(as described in PROJECT_BRIEF)? If so, what scenarios does it need "
+                f"to handle that are currently untested?"
+            ),
+            "success_looks_like": (
+                f"Tests exist for `{name}` covering its primary execution paths, "
+                f"or the function is confirmed non-critical and the gap is documented."
+            ),
+            "diagnostic_type": "Fix",
+            "chunk_ids": [chunk_id],
+            "signal_type": "coverage_gap",
+            "chunk_name": name,
+            "chunk_file": file_path,
+            "functional_role": functional_role,
+            "composite_score": composite_score,
+            "project_brief_text": brief_text,
+            "domain_glossary_text": glossary_text,
+        })
+
+    # Coupling hotspots: highest coupling score
+    cur = conn.execute(
+        "SELECT cc.id, cc.name, cc.file_path, cc.functional_role, "
+        "hs.composite_score, hs.coupling_score "
+        "FROM health_scores hs "
+        "JOIN code_chunks cc ON hs.chunk_id = cc.id "
+        "WHERE hs.cycle_id = ? AND cc.project_id = ? "
+        "ORDER BY hs.coupling_score DESC "
+        "LIMIT ?",
+        (latest_cycle_id, project_id, n_coupling),
+    )
+    for row in cur.fetchall():
+        chunk_id, name, file_path, functional_role, composite_score, coupling_score = row
+        findings.append({
+            "finding_type": "intent_gap",
+            "severity": _severity_from_composite(composite_score),
+            "title": f"{name} ({file_path}) — high-coupling node (coupling_score={coupling_score:.2f})",
+            "what": (
+                f"Chunk `{name}` has coupling score {coupling_score:.2f}. "
+                f"It is a high-connectivity node in the dependency graph. "
+                f"Functional role: {functional_role or 'unclassified'}. "
+                f"Composite score: {composite_score:.2f}."
+            ),
+            "why_it_matters": (
+                f"High-coupling nodes are high-blast-radius targets — changes propagate to "
+                f"many dependents. If this node's behavior is ambiguous or undocumented, "
+                f"that ambiguity ripples through all callers."
+            ),
+            "what_needs_discovering": (
+                f"Does `{name}` represent a stable, well-understood abstraction? "
+                f"Does its behavior align with what the domain glossary implies for "
+                f"its role ({functional_role or 'unclassified'})?"
+            ),
+            "success_looks_like": (
+                f"The coupling is understood and justified by the project's architecture, "
+                f"or the node is refactored to reduce blast radius."
+            ),
+            "diagnostic_type": "Architecture check",
+            "chunk_ids": [chunk_id],
+            "signal_type": "coupling_hotspot",
+            "chunk_name": name,
+            "chunk_file": file_path,
+            "functional_role": functional_role,
+            "composite_score": composite_score,
+            "project_brief_text": brief_text,
+            "domain_glossary_text": glossary_text,
+        })
+
+    # Complexity hotspots: highest complexity_score (proxy for cyclomatic complexity)
+    cur = conn.execute(
+        "SELECT cc.id, cc.name, cc.file_path, cc.functional_role, cc.structural_metadata, "
+        "hs.composite_score, hs.complexity_score "
+        "FROM health_scores hs "
+        "JOIN code_chunks cc ON hs.chunk_id = cc.id "
+        "WHERE hs.cycle_id = ? AND cc.project_id = ? "
+        "AND cc.structural_metadata IS NOT NULL "
+        "ORDER BY hs.complexity_score DESC "
+        "LIMIT ?",
+        (latest_cycle_id, project_id, n_complexity),
+    )
+    for row in cur.fetchall():
+        chunk_id, name, file_path, functional_role, structural_metadata, composite_score, complexity_score = row
+        meta = {}
+        try:
+            meta = json.loads(structural_metadata) if structural_metadata else {}
+        except (json.JSONDecodeError, TypeError):
+            pass
+        cyclomatic_complexity = meta.get("cyclomatic_complexity", 0)
+        nesting_depth = meta.get("nesting_depth", 0)
+        parameter_count = meta.get("parameter_count", 0)
+        findings.append({
+            "finding_type": "intent_gap",
+            "severity": _severity_from_composite(composite_score),
+            "title": (
+                f"{name} ({file_path}) — high cyclomatic complexity "
+                f"(complexity_score={complexity_score:.2f}, cyclomatic={cyclomatic_complexity})"
+            ),
+            "what": (
+                f"Function `{name}` has complexity score {complexity_score:.2f} "
+                f"with cyclomatic complexity {cyclomatic_complexity}, "
+                f"nesting depth {nesting_depth}, and {parameter_count} parameters. "
+                f"Functional role: {functional_role or 'unclassified'}."
+            ),
+            "why_it_matters": (
+                f"High-complexity code is harder to reason about and more likely to "
+                f"contain latent bugs, especially in domain-critical paths. "
+                f"Composite score: {composite_score:.2f}."
+            ),
+            "what_needs_discovering": (
+                f"Does `{name}` encode complex business rules that belong in this function, "
+                f"or has incidental complexity accumulated over time? Does this function's "
+                f"complexity align with the project's stated domain goals?"
+            ),
+            "success_looks_like": (
+                f"The function is refactored to reduce complexity, or its complexity is "
+                f"justified and documented as intentional domain logic."
+            ),
+            "diagnostic_type": "Fix",
+            "chunk_ids": [chunk_id],
+            "signal_type": "complexity_hotspot",
+            "chunk_name": name,
+            "chunk_file": file_path,
+            "functional_role": functional_role,
+            "composite_score": composite_score,
+            "project_brief_text": brief_text,
+            "domain_glossary_text": glossary_text,
+        })
+
+    return findings
+
+
+def write_intent_audit(findings: list[dict], project_path: str,
+                       project_name: str) -> str:
+    """
+    Write Phase 2.1 intent gap findings to {project_path}/knowledge/anvil/audit-findings-{date}.md.
+
+    Findings are grouped by severity (CRITICAL → HIGH → MEDIUM → LOW) using the
+    Phase 2 canonical finding format. Returns the output file path.
+    """
+    audit_dir = os.path.join(project_path, "knowledge", "anvil")
+    os.makedirs(audit_dir, exist_ok=True)
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    output_path = os.path.join(audit_dir, f"audit-findings-{today}.md")
+
+    severity_order = ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    by_severity: dict[str, list[dict]] = {s: [] for s in severity_order}
+    for finding in findings:
+        sev = finding.get("severity", "LOW").upper()
+        by_severity.setdefault(sev, []).append(finding)
+
+    lines = [
+        f"# Anvil Audit Findings — {project_name}",
+        f"**Date:** {today}  |  **Total findings:** {len(findings)}  |  **Source:** find_intent_gaps()",
+        "",
+    ]
+
+    for sev in severity_order:
+        for finding in by_severity[sev]:
+            lines.append(f"## {sev} — {finding['title']}")
+            lines.append("")
+            lines.append(f"**What:** {finding['what']}")
+            lines.append("")
+            lines.append(f"**Why it matters:** {finding['why_it_matters']}")
+            lines.append("")
+            lines.append(f"**What needs to be discovered:** {finding['what_needs_discovering']}")
+            lines.append("")
+            lines.append(f"**Success looks like:** {finding['success_looks_like']}")
+            lines.append("")
+            lines.append(f"**Diagnostic type:** {finding['diagnostic_type']}")
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
+    content = "\n".join(lines)
+    with open(output_path, "w") as f:
+        f.write(content)
+
+    return output_path
 
 
 def generate_planner_constraints(conn, project_name: str, cycle_id: int,
@@ -612,6 +891,21 @@ def write_cycle_report(conn, project_name: str, cycle_id: int,
                 )
     else:
         lines.append("No best practice deviations found.")
+    lines.append("")
+
+    # Intent gaps
+    intent_gaps_list = findings.get("intent_gaps", [])
+    lines.append(f"## Intent Gaps ({len(intent_gaps_list)} findings)")
+    if intent_gaps_list:
+        lines.append("| Severity | Signal Type | Title | Diagnostic |")
+        lines.append("|---|---|---|---|")
+        for ig in intent_gaps_list[:20]:
+            lines.append(
+                f"| {ig['severity']} | {ig.get('signal_type', '')} | "
+                f"{ig['title'][:80]} | {ig['diagnostic_type']} |"
+            )
+    else:
+        lines.append("No intent gaps found.")
     lines.append("")
 
     # Planner constraints
