@@ -28,3 +28,9 @@
 **What happened:** The first Cycle 11 run (with empty mission) was stored as cycle_number=11. The fix re-run was stored as cycle_number=12. QA Step 2's DB check queries `WHERE cycle_number=11` — this will return the unfixed run, not the corrected one. The cycle number in cycle_reports does not match the plan name.
 **Recommendation:** Plan prompts for QA that check `WHERE cycle_number=N` should reference the actual DB cycle number from the dev log, not the plan label. Or: re-run should delete the stale cycle_report row before re-running to preserve the expected cycle_number.
 
+### 2026-04-14 — QA manual recovery: Bellows write-race stranded plan
+**Agent:** Anvil QA Analyst
+**Prompt type:** Manual Bellows-recovery bootstrap (not a plan file routed through Bellows).
+**What happened:** The `executable-anvil-test-failures-fixture-2026-04-14` plan was deposited but stranded due to a write-race during the Bellows plan deposit phase. DEV's fix commit (`c49f060`) landed successfully, but the plan was never routed to QA via Bellows. A manual QA bootstrap prompt was used to verify deliverables, run the full test suite, deposit evidence, write the QA report, pass Rule 20, update PROJECT_STATUS.md, and move the plan to Done.
+**Recommendation:** Write-races during plan deposit can strand plans in a limbo state where DEV work is done but QA never executes. When this happens, a manual QA bootstrap prompt can recover the closeout. Consider adding a Bellows health-check that detects plans with completed DEV commits but no QA evidence after a timeout period.
+
