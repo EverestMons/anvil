@@ -64,7 +64,7 @@ def lab_project(conn):
     conn.commit()
     create_health_score(conn, c1, cycle_id=1, volatility_score=0.9,
                         coverage_score=1.0, complexity_score=0.95,
-                        coupling_score=0.85, staleness_score=0.7,
+                        coupling_score=0.85, staleness_score=0.85,
                         composite_score=0.75)
 
     # Low-risk tested function
@@ -108,7 +108,7 @@ def lab_project(conn):
     create_similarity(conn, c1, c4, 0.85, cycle_id=1)
 
     # Git changes for co-change
-    for i in range(4):
+    for i in range(5):
         create_git_change(conn, pid, "main.py", f"hash{i}",
                           f"2026-03-{20+i}", f"commit {i}", "dev")
         create_git_change(conn, pid, "utils.py", f"hash{i}",
@@ -180,7 +180,7 @@ def test_find_staleness_alerts(conn, lab_project):
     pid, _, _, _, _ = lab_project
     alerts = find_staleness_alerts(conn, pid, 1)
     stale_names = [a["name"] for a in alerts]
-    assert "risky_func" in stale_names  # staleness=0.7 >= 0.6 threshold
+    assert "risky_func" in stale_names  # staleness=0.85 >= 0.8 threshold
 
 
 # --- find_complexity_hotspots ---
