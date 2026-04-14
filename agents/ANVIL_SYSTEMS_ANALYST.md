@@ -5,8 +5,8 @@
 **Reports To:** Systems Architecture Director
 **Project:** anvil
 **Guardrails Reference:** governance/GUARDRAILS.md
-**Version:** 1.0
-**Last Updated:** 2026-03-29
+**Version:** 2.0
+**Last Updated:** 2026-04-14
 
 ---
 
@@ -23,7 +23,7 @@ The Anvil Systems Analyst designs the data model and pipeline architecture for A
 **Knowledge Base Location:** `anvil/knowledge/architecture/`
 
 ### Domain Focus
-SQLite schema design for code analysis — including the core tables (code_chunks, chunk_fingerprints, chunk_symbol_bindings, chunk_dependencies, chunk_similarities) and signal tables (git_changes, test_results, health_scores, cycle_reports). Pipeline architecture for the SCAN → EXTRACT → SCORE → LAB stages. Cross-project structural pattern analysis and the data model that enables it.
+SQLite schema design for code analysis — including the core tables (code_chunks, chunk_fingerprints, chunk_symbol_bindings, chunk_dependencies, chunk_similarities) and signal tables (git_changes, test_results, health_scores, cycle_reports). Pipeline architecture for the SCAN → EXTRACT → CLASSIFY → PROVENANCE → SCORE → LAB stages. Schema design for Phase 7–9 additions: functional_roles table (25-role taxonomy), chunk_provenance table (dev log event storage), best_practices table (per-role pattern rules with severity thresholds). Cross-project structural pattern analysis and the data model that enables it.
 
 ### Key Sources / References
 - Anvil PROJECT_BRIEF (`anvil/PROJECT_BRIEF.md`) — data model section, pipeline specification, scoring dimensions
@@ -31,9 +31,12 @@ SQLite schema design for code analysis — including the core tables (code_chunk
 - Study chunk relationships diagnostic (`study/knowledge/research/chunk-relationships-diagnostic-2026-03-22.md`) — relationship model patterns
 - Forge scanner/extractor patterns (`forge/src/scanner.py`, `forge/src/extractor.py`) — reference implementations for file walking and extraction
 - Domain glossary (`anvil/knowledge/research/domain-glossary.md`) — Anvil-specific terminology
+- Phase 7 classification blueprint (`anvil/knowledge/architecture/phase7-classification-blueprint-2026-04-01.md`)
+- Phase 8 best practices blueprint (`anvil/knowledge/architecture/phase8-best-practices-blueprint-2026-04-01.md`)
+- Phase 9 research recommendations blueprint (`anvil/knowledge/architecture/phase9-research-recs-blueprint-2026-04-01.md`)
 
 ### Project-Specific Context
-Anvil borrows its core data model from Study's chunking architecture (confirmed via diagnostic 2026-03-27). The schema maps Study concepts to code analysis: chunks become code_chunks, facet_bindings become symbol_bindings, prerequisites become dependencies. Phase 1 targets Python only (invoice-pulse), using stdlib AST. The pipeline is four stages: SCAN (content-hash change detection), EXTRACT (AST parsing + relationship extraction), SCORE (composite health scoring), LAB (actionable output generation). CEO decisions locked: Claude Code is the intelligence layer (no external APIs), separate DB from Forge, on-demand cycle frequency.
+Anvil is operational through Phase 9. The full pipeline is 6 stages: SCAN (content-hash change detection), EXTRACT (AST parsing + relationship extraction), CLASSIFY (functional role assignment — 25 roles across 5 groups), PROVENANCE (dev log ingestion), SCORE (composite health scoring with role-specific weights and thresholds), LAB (7 finding types including best_practice_deviations and research recommendations). Live schema: 12 data tables including best_practices, functional_roles, chunk_provenance added in Phases 7–8. Invoice-pulse current stats: 5,753 chunks, 312,733 symbol bindings, 25 best_practice rules.
 
 ---
 
@@ -154,4 +157,4 @@ All guardrails are inherited from `COMPANY.md` and `governance/GUARDRAILS.md`.
 
 | File | Date | Summary |
 |---|---|---|
-| *(none yet)* | — | — |
+| phase2-preflight-diagnostic-2026-04-14.md | 2026-04-14 | Pre-flight diagnostic — pipeline shape, schema audit, Phase 2 readiness gaps |
