@@ -26,6 +26,23 @@ from src.config import (
 )
 from src.detector import check_best_practice
 
+_SESSION_LIFECYCLE_NAMES = frozenset({"execute", "commit", "close", "rollback", "begin"})
+_SESSION_LIFECYCLE_PATH_HINTS = ("profile_ingestion", "database", "_session", "_engine", "session_manager")
+_CONNECTION_FACTORY_NAMES = frozenset({"get_connection", "get_session", "get_db", "_get_db", "connect", "get_engine"})
+
+
+def _is_noise_chunk(chunk: dict) -> bool:
+    """Return True if chunk is a known noise source (test files, session lifecycle, connection factories)."""
+    file_path = chunk.get("file_path", "")
+    name = chunk.get("name", "")
+    if file_path.startswith("tests/"):
+        return True
+    if name in _CONNECTION_FACTORY_NAMES:
+        return True
+    if name in _SESSION_LIFECYCLE_NAMES and any(pat in file_path for pat in _SESSION_LIFECYCLE_PATH_HINTS):
+        return True
+    return False
+
 
 def run_lab(conn, project_name: str, cycle_id: int) -> dict:
     """
@@ -102,17 +119,20 @@ def find_coverage_gaps(conn, project_id: int, cycle_id: int) -> list[dict]:
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND hs.coverage_score >= ? "
         "AND hs.composite_score >= ? AND cc.chunk_type != 'test_case' "
+        "AND cc.file_path NOT LIKE 'tests/%' "
         "ORDER BY hs.composite_score DESC",
         (cycle_id, COVERAGE_GAP_THRESHOLD, HIGH_RISK_THRESHOLD),
     )
-    return [
-        {
+    results = []
+    for r in cur.fetchall():
+        if _is_noise_chunk({"name": r[2], "file_path": r[1]}):
+            continue
+        results.append({
             "chunk_id": r[0], "file_path": r[1], "name": r[2],
             "chunk_type": r[3], "composite_score": r[4],
             "coverage_score": r[5], "volatility_score": r[6],
-        }
-        for r in cur.fetchall()
-    ]
+        })
+    return results
 
 
 def find_coupling_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
@@ -128,6 +148,7 @@ def find_coupling_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
         "FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND hs.coupling_score >= ? "
+        "AND cc.file_path NOT LIKE 'tests/%' "
         "ORDER BY hs.coupling_score DESC",
         (cycle_id, min_threshold),
     )
@@ -153,6 +174,8 @@ def find_coupling_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
         inbound = in_cur.fetchone()[0]
         outbound = out_cur.fetchone()[0]
 
+        if _is_noise_chunk({"name": r[2], "file_path": r[1]}):
+            continue
         results.append({
             "chunk_id": chunk_id, "file_path": r[1], "name": r[2],
             "coupling_score": r[3], "composite_score": r[4],
@@ -220,6 +243,7 @@ def find_complexity_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND hs.complexity_score >= ? "
         "AND cc.project_id = ? "
+        "AND cc.file_path NOT LIKE 'tests/%' "
         "ORDER BY hs.complexity_score DESC",
         (cycle_id, min_threshold, project_id),
     )
@@ -231,6 +255,8 @@ def find_complexity_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]
         if r[4] < threshold:
             continue
 
+        if _is_noise_chunk({"name": r[2], "file_path": r[1]}):
+            continue
         meta = {}
         if r[3]:
             try:
@@ -453,6 +479,8 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
     )
     for row in cur.fetchall():
         chunk_id, name, file_path, chunk_type, functional_role, composite_score, volatility_score, coverage_score = row
+        if _is_noise_chunk({"name": name, "file_path": file_path}):
+            continue
         findings.append({
             "finding_type": "intent_gap",
             "severity": _severity_from_composite(composite_score),
@@ -505,6 +533,8 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
     )
     for row in cur.fetchall():
         chunk_id, name, file_path, functional_role, composite_score, coupling_score = row
+        if _is_noise_chunk({"name": name, "file_path": file_path}):
+            continue
         findings.append({
             "finding_type": "intent_gap",
             "severity": _severity_from_composite(composite_score),
@@ -558,6 +588,8 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
     )
     for row in cur.fetchall():
         chunk_id, name, file_path, functional_role, structural_metadata, composite_score, complexity_score = row
+        if _is_noise_chunk({"name": name, "file_path": file_path}):
+            continue
         meta = {}
         try:
             meta = json.loads(structural_metadata) if structural_metadata else {}

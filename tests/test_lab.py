@@ -26,6 +26,7 @@ from src.lab import (
     write_cycle_report,
     generate_specialist_update_data,
     _extract_project_mission,
+    _is_noise_chunk,
 )
 from src.config import SCAN_TARGETS
 
@@ -400,3 +401,16 @@ def test_find_intent_gaps_excludes_test_files(conn, tmp_path):
     chunk_files = [f["chunk_file"] for f in result]
     for cf in chunk_files:
         assert not cf.startswith("tests/"), f"Test file leaked into findings: {cf}"
+
+
+def test_is_noise_chunk_test_file():
+    assert _is_noise_chunk({"name": "foo", "file_path": "tests/test_bar.py"}) is True
+
+
+def test_is_noise_chunk_session_lifecycle():
+    assert _is_noise_chunk({"name": "execute", "file_path": "profile_ingestion.py"}) is True
+    assert _is_noise_chunk({"name": "execute", "file_path": "app.py"}) is False
+
+
+def test_is_noise_chunk_connection_factory():
+    assert _is_noise_chunk({"name": "get_connection", "file_path": "database.py"}) is True
