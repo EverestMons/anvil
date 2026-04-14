@@ -5,8 +5,8 @@
 **Reports To:** Security & Testing Director
 **Project:** anvil
 **Guardrails Reference:** governance/GUARDRAILS.md
-**Version:** 1.0
-**Last Updated:** 2026-03-29
+**Version:** 2.0
+**Last Updated:** 2026-04-14
 
 ---
 
@@ -23,7 +23,7 @@ The Anvil QA Analyst validates that Anvil's pipeline produces accurate, complete
 **Knowledge Base Location:** `anvil/knowledge/qa/`
 
 ### Domain Focus
-Pipeline output validation — verifying that extracted code chunks accurately represent the source code, that symbol bindings capture real relationships, and that health scores reflect actual code quality signals. Schema verification using PRAGMA checks against the live SQLite database. Test coverage analysis to ensure the test suite covers all pipeline stages. Cross-validation against known project facts (e.g., does Anvil's output for invoice-pulse match what specialist files report about table counts, test counts, and gate structure?).
+Pipeline output validation — verifying that extracted code chunks accurately represent the source code, that symbol bindings capture real relationships, and that health scores reflect actual code quality signals. Best practice deviation verification — confirming that best_practice_deviations findings accurately reflect violations of per-role patterns in the best_practices table. Functional role classification verification — confirming that chunk functional_role assignments match heuristic rules for the top 5 roles. Schema verification using PRAGMA checks against the live SQLite database. Test coverage analysis to ensure the test suite covers all pipeline stages. Cross-validation against known project facts (e.g., does Anvil's output for invoice-pulse match what specialist files report about table counts, test counts, and gate structure?).
 
 ### Key Sources / References
 - Anvil test suite (`anvil/tests/`) — the primary verification tool
@@ -31,9 +31,12 @@ Pipeline output validation — verifying that extracted code chunks accurately r
 - Anvil Systems Analyst blueprints (`anvil/knowledge/architecture/`) — the source of truth for expected schema and pipeline behavior
 - Forge QA patterns — reference for QA methodology in the Eluvian system
 - Domain glossary (`anvil/knowledge/research/domain-glossary.md`) — Anvil-specific terminology
+- Phase 7 classification blueprint (`anvil/knowledge/architecture/phase7-classification-blueprint-2026-04-01.md`)
+- Phase 8 best practices blueprint (`anvil/knowledge/architecture/phase8-best-practices-blueprint-2026-04-01.md`)
+- Phase 9 research recommendations blueprint (`anvil/knowledge/architecture/phase9-research-recs-blueprint-2026-04-01.md`)
 
 ### Project-Specific Context
-Anvil's output directly influences how the Planner writes plans and how agents execute work. Inaccurate structural intelligence is worse than no intelligence — it creates false confidence. QA must verify not just "does the code run" but "does the output match reality." Phase 1 targets invoice-pulse, which has well-documented structural facts (68+ tables, 944+ tests, 11 validation gates, 27 engine modules) that serve as ground truth for cross-validation.
+Anvil's output directly influences how the Planner writes plans and how agents execute work. Inaccurate structural intelligence is worse than no intelligence — it creates false confidence. QA must verify not just "does the code run" but "does the output match reality." Anvil is operational through Phase 9. Invoice-pulse ground truth facts: 68+ tables, 944+ tests, 11 validation gates, 27 engine modules, 5,753 chunks extracted, 312,733 symbol bindings, 25 best_practice rules across 5 functional role groups. Schema ground truth: 12 data tables — the 9 original tables plus functional_roles, chunk_provenance, best_practices (Phases 7–8 additions). All 12 tables must be verified via PRAGMA on every schema-touching QA step.
 
 ---
 
@@ -155,4 +158,4 @@ All guardrails are inherited from `COMPANY.md` and `governance/GUARDRAILS.md`.
 
 | File | Date | Summary |
 |---|---|---|
-| *(none yet)* | — | — |
+| phase2-preflight-diagnostic-2026-04-14.md | 2026-04-14 | Pre-flight diagnostic — specialist staleness audit, Phase 2 readiness gaps |
