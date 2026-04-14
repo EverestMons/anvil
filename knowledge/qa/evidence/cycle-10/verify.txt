@@ -1,0 +1,68 @@
+Anvil Cycle 10 QA Verification Evidence
+Date: 2026-04-14
+Agent: Anvil QA Analyst
+
+=== CHECK 1: invoice-pulse/knowledge/anvil/ directory ===
+Path: /Users/marklehn/Desktop/GitHub/invoice-pulse/knowledge/anvil/
+Contents: audit-findings-2026-04-14.md
+RESULT: PASS — directory exists, audit-findings file present
+
+=== CHECK 2: audit-findings-2026-04-14.md severity grep ===
+Pattern: CRITICAL|HIGH|MEDIUM|LOW|Intent Gap
+Header line: "Total findings: 20 | Source: find_intent_gaps()"
+Severity markers found in file: YES
+CRITICAL headings: 7
+HIGH headings: 1
+MEDIUM headings: 6
+LOW headings: 6
+Total: 20
+RESULT: PASS — file exists, severity markers present, find_intent_gaps() confirmed as source
+
+=== CHECK 3: cycle_reports DB row ===
+Query: SELECT cycle_number, findings_count, chunks_scored FROM cycle_reports WHERE cycle_number=10
+Result: (10, 2066, 3836)
+cycle_number: 10
+findings_count: 2066
+chunks_scored: 3836
+RESULT: PASS — row exists with expected values
+
+=== CHECK 4: cycle-10-findings-2026-04-14.md ===
+Path: /Users/marklehn/Desktop/GitHub/anvil/knowledge/research/cycle-10-findings-2026-04-14.md
+RESULT: PASS — file exists
+
+=== INTENT GAPS SUMMARY ===
+Total intent gap findings: 20
+Source function: find_intent_gaps()
+
+Severity breakdown:
+  CRITICAL: 7
+    - dispute_brief (app.py) — uncovered high-volatility (composite 0.81)
+    - team_dashboard (app.py) — uncovered high-volatility (composite 0.80)
+    - invoice_detail (app.py) — uncovered high-volatility (composite 0.79)
+    - run_validation (app.py) — uncovered high-volatility (composite 0.77)
+    - debug_export (app.py) — uncovered high-volatility (composite 0.77)
+    - ingest_xml_paste (app.py) — uncovered high-volatility (composite 0.77)
+    - invoice_detail (app.py) — high cyclomatic complexity (cyclomatic=86, composite 0.79)
+  HIGH: 1
+    - create_contract_tables (contract_tables.py) — high-coupling node (coupling=0.99, composite 0.74)
+  MEDIUM: 6
+    - test_main (test_validator.py) — high-coupling node
+    - InvoiceXMLParser (xml_parser.py) — high complexity (cyclomatic=91)
+    - test_main (test_contract_templates.py) — high complexity (cyclomatic=108)
+    - test_main (test_contracts.py) — high complexity (cyclomatic=101)
+    - test_main (test_disputes.py) — high complexity (cyclomatic=105)
+    - test_main (test_forms_and_uploads.py) — high complexity (cyclomatic=128)
+  LOW: 6
+    - execute (profile_ingestion.py) — high-coupling node
+    - commit (profile_ingestion.py) — high-coupling node
+    - close (profile_ingestion.py) — high-coupling node
+    - test_main (test_lifecycle.py) — high-coupling node
+    - test_main (test_lifecycle.py) — high complexity (cyclomatic=113)
+    - test_main (test_upload_endpoints.py) — high complexity (cyclomatic=106)
+
+Top 3 findings:
+  1. CRITICAL — dispute_brief (app.py) — uncovered high-volatility function (composite 0.81)
+  2. CRITICAL — team_dashboard (app.py) — uncovered high-volatility function (composite 0.80)
+  3. CRITICAL — invoice_detail (app.py) — uncovered high-volatility function (composite 0.79)
+
+=== OVERALL: 4/4 CHECKS PASS ===
