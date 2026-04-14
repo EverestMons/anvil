@@ -1,0 +1,57 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/marklehn/Desktop/GitHub/anvil
+plugins: anyio-4.12.1, cov-7.0.0
+collecting ... collected 20 items
+
+tests/test_lab.py::test_find_coverage_gaps PASSED                        [  5%]
+tests/test_lab.py::test_coverage_gaps_excludes_tested PASSED             [ 10%]
+tests/test_lab.py::test_find_coupling_hotspots PASSED                    [ 15%]
+tests/test_lab.py::test_find_clone_candidates PASSED                     [ 20%]
+tests/test_lab.py::test_find_cochange_patterns FAILED                    [ 25%]
+tests/test_lab.py::test_find_staleness_alerts FAILED                     [ 30%]
+tests/test_lab.py::test_find_complexity_hotspots PASSED                  [ 35%]
+tests/test_lab.py::test_planner_constraints_structure PASSED             [ 40%]
+tests/test_lab.py::test_planner_constraints_has_coverage_type PASSED     [ 45%]
+tests/test_lab.py::test_write_cycle_report PASSED                        [ 50%]
+tests/test_lab.py::test_run_lab_end_to_end PASSED                        [ 55%]
+tests/test_lab.py::test_run_lab_unknown_project PASSED                   [ 60%]
+tests/test_lab.py::test_find_intent_gaps_missing_brief PASSED            [ 65%]
+tests/test_lab.py::test_find_intent_gaps_returns_required_keys PASSED    [ 70%]
+tests/test_lab.py::test_extract_project_mission_found PASSED             [ 75%]
+tests/test_lab.py::test_extract_project_mission_not_found PASSED         [ 80%]
+tests/test_lab.py::test_find_intent_gaps_excludes_test_files PASSED      [ 85%]
+tests/test_lab.py::test_is_noise_chunk_test_file PASSED                  [ 90%]
+tests/test_lab.py::test_is_noise_chunk_session_lifecycle PASSED          [ 95%]
+tests/test_lab.py::test_is_noise_chunk_connection_factory PASSED         [100%]
+
+=================================== FAILURES ===================================
+_________________________ test_find_cochange_patterns __________________________
+
+conn = <sqlite3.Connection object at 0x10ae94300>, lab_project = (1, 2, 3, 4, 5)
+
+    def test_find_cochange_patterns(conn, lab_project):
+        pid, _, _, _, _ = lab_project
+        patterns = find_cochange_patterns(conn, pid)
+>       assert len(patterns) >= 1
+E       assert 0 >= 1
+E        +  where 0 = len([])
+
+tests/test_lab.py:165: AssertionError
+__________________________ test_find_staleness_alerts __________________________
+
+conn = <sqlite3.Connection object at 0x10ae946c0>, lab_project = (1, 2, 3, 4, 5)
+
+    def test_find_staleness_alerts(conn, lab_project):
+        pid, _, _, _, _ = lab_project
+        alerts = find_staleness_alerts(conn, pid, 1)
+        stale_names = [a["name"] for a in alerts]
+>       assert "risky_func" in stale_names  # staleness=0.7 >= 0.6 threshold
+E       AssertionError: assert 'risky_func' in []
+
+tests/test_lab.py:183: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_lab.py::test_find_cochange_patterns - assert 0 >= 1
+FAILED tests/test_lab.py::test_find_staleness_alerts - AssertionError: assert...
+========================= 2 failed, 18 passed in 0.06s =========================

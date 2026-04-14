@@ -1,0 +1,22 @@
+create_contract_tables contract_tables.py 0.9914
+_create_tables database.py 0.9743
+extend_existing_tables contract_tables.py 0.96
+triangulate engines/triangulation.py 0.9571
+init_db database.py 0.9543
+_to_float ingestion/ingest.py 0.9514
+validate_invoice engines/validator.py 0.9457
+_table_exists app.py 0.9371
+add engines/validator.py 0.9286
+import_activity_history ingestion/activity_import.py 0.9229
+gate_9_accessorials engines/validator.py 0.9171
+_safe_add_column contract_tables.py 0.9143
+gate_8_fuel engines/validator.py 0.9057
+_build_dashboard_cards web/contracts.py 0.9029
+gate_7_linehaul engines/validator.py 0.9
+run_pro_exit_interviews engines/exit_interview.py 0.8914
+route_actions engines/action_router.py 0.8886
+_insert_charge ingestion/ingest.py 0.8857
+_float_or_none web/carrier_profiles.py 0.8743
+write_extraction_quality_report extraction_tracking.py 0.8714
+NOISE_COUNT=0
+ASSERT_PASSED

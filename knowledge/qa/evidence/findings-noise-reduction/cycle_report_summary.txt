@@ -1,0 +1,1 @@
+Cycle 13 — knowledge/research/cycle-13-findings-2026-04-14.md — Coupling Hotspots (44 findings): zero tests/ and zero profile_ingestion rows.
