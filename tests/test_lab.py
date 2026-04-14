@@ -25,6 +25,7 @@ from src.lab import (
     generate_planner_constraints,
     write_cycle_report,
     generate_specialist_update_data,
+    _extract_project_mission,
 )
 from src.config import SCAN_TARGETS
 
@@ -344,3 +345,58 @@ def test_find_intent_gaps_returns_required_keys(conn, tmp_path):
         assert isinstance(finding["chunk_ids"], list)
         assert finding["finding_type"] == "intent_gap"
         assert finding["severity"] in ("CRITICAL", "HIGH", "MEDIUM", "LOW")
+
+
+# --- _extract_project_mission ---
+
+def test_extract_project_mission_found():
+    brief = "# My Project\n\n## Mission\n\nSome mission text.\n\n## Other\n\nOther stuff."
+    result = _extract_project_mission(brief)
+    assert result == "Some mission text."
+
+
+def test_extract_project_mission_not_found():
+    result = _extract_project_mission("This is plain text with no headings.")
+    assert result == ""
+
+
+def test_find_intent_gaps_excludes_test_files(conn, tmp_path):
+    """Findings must not include chunks whose file_path starts with tests/."""
+    (tmp_path / "PROJECT_BRIEF.md").write_text("## Mission\n\nProcess invoices.\n")
+    glossary_dir = tmp_path / "knowledge" / "research"
+    glossary_dir.mkdir(parents=True)
+    (glossary_dir / "domain-glossary.md").write_text("# Glossary\n")
+
+    pid = create_project(conn, "gap-filter-test", str(tmp_path))
+
+    # Chunk in tests/ — should be excluded
+    test_chunk = create_chunk(
+        conn, project_id=pid, file_path="tests/test_foo.py", chunk_type="function",
+        name="test_something", content="def test_something(): pass",
+        content_hash="test_h1", start_line=1, end_line=3,
+    )
+    create_health_score(
+        conn, test_chunk, cycle_id=1,
+        composite_score=0.90, coverage_score=0.95,
+        volatility_score=0.90, coupling_score=0.90,
+        complexity_score=0.90, staleness_score=0.50,
+    )
+
+    # Chunk in app.py — should appear
+    app_chunk = create_chunk(
+        conn, project_id=pid, file_path="app.py", chunk_type="function",
+        name="process_invoice", content="def process_invoice(): pass",
+        content_hash="app_h1", start_line=1, end_line=5,
+    )
+    create_health_score(
+        conn, app_chunk, cycle_id=1,
+        composite_score=0.85, coverage_score=0.90,
+        volatility_score=0.85, coupling_score=0.80,
+        complexity_score=0.80, staleness_score=0.40,
+    )
+
+    result = find_intent_gaps(conn, "gap-filter-test", str(tmp_path), top_n=10)
+
+    chunk_files = [f["chunk_file"] for f in result]
+    for cf in chunk_files:
+        assert not cf.startswith("tests/"), f"Test file leaked into findings: {cf}"

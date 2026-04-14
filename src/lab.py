@@ -346,6 +346,44 @@ def _severity_from_composite(score: float) -> str:
     return "LOW"
 
 
+def _extract_project_mission(brief_text: str) -> str:
+    """
+    Extract the project mission from PROJECT_BRIEF.md text.
+
+    Looks for a line starting with ## Mission, ## Overview, or ## Purpose,
+    then returns the next non-empty paragraph (up to 3 sentences).
+    Returns empty string if no such heading is found.
+    """
+    import re
+    lines = brief_text.splitlines()
+    heading_pattern = re.compile(r'^##\s+(Mission|Overview|Purpose)\s*$', re.IGNORECASE)
+    found_heading = False
+    paragraph_lines = []
+    for line in lines:
+        if not found_heading:
+            if heading_pattern.match(line.strip()):
+                found_heading = True
+            continue
+        # Skip blank lines before paragraph starts
+        if not paragraph_lines and not line.strip():
+            continue
+        # Stop at next heading or after collecting paragraph content
+        if line.startswith('#'):
+            break
+        if not line.strip() and paragraph_lines:
+            break
+        if line.strip():
+            paragraph_lines.append(line.strip())
+
+    if not paragraph_lines:
+        return ""
+
+    paragraph = " ".join(paragraph_lines)
+    # Limit to 3 sentences
+    sentences = re.split(r'(?<=[.!?])\s+', paragraph)
+    return " ".join(sentences[:3]).strip()
+
+
 def find_intent_gaps(conn, project_name: str, project_path: str,
                      top_n: int = 20) -> list[dict]:
     """
@@ -371,6 +409,8 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
         brief_text = f.read()
     with open(glossary_path) as f:
         glossary_text = f.read()
+
+    mission = _extract_project_mission(brief_text)
 
     project = db.get_project(conn, project_name)
     if project is None:
@@ -403,6 +443,7 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND cc.project_id = ? "
         "AND hs.coverage_score >= 0.8 AND cc.chunk_type != 'test_case' "
+        "AND cc.file_path NOT LIKE 'tests/%' "
         "ORDER BY hs.volatility_score DESC, hs.composite_score DESC "
         "LIMIT ?",
         (latest_cycle_id, project_id, n_coverage),
@@ -425,6 +466,9 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
                 f"Composite score: {composite_score:.2f}."
             ),
             "what_needs_discovering": (
+                f"Given that {mission.strip()} — does '{name}' perform logic critical to this mission? "
+                f"What scenarios does it need to handle that are currently untested?"
+                if mission else
                 f"Does `{name}` perform logic critical to the project's core goals "
                 f"(as described in PROJECT_BRIEF)? If so, what scenarios does it need "
                 f"to handle that are currently untested?"
@@ -451,6 +495,7 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
         "FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND cc.project_id = ? "
+        "AND cc.file_path NOT LIKE 'tests/%' "
         "ORDER BY hs.coupling_score DESC "
         "LIMIT ?",
         (latest_cycle_id, project_id, n_coupling),
@@ -473,6 +518,9 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
                 f"that ambiguity ripples through all callers."
             ),
             "what_needs_discovering": (
+                f"Given that {mission.strip()} — does '{name}' perform logic critical to this mission? "
+                f"What scenarios does it need to handle that are currently a high-blast-radius risk?"
+                if mission else
                 f"Does `{name}` represent a stable, well-understood abstraction? "
                 f"Does its behavior align with what the domain glossary implies for "
                 f"its role ({functional_role or 'unclassified'})?"
@@ -500,6 +548,7 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND cc.project_id = ? "
         "AND cc.structural_metadata IS NOT NULL "
+        "AND cc.file_path NOT LIKE 'tests/%' "
         "ORDER BY hs.complexity_score DESC "
         "LIMIT ?",
         (latest_cycle_id, project_id, n_complexity),
@@ -533,6 +582,9 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
                 f"Composite score: {composite_score:.2f}."
             ),
             "what_needs_discovering": (
+                f"Given that {mission.strip()} — does '{name}' perform logic critical to this mission? "
+                f"What scenarios does it need to handle that are currently a maintainability concern?"
+                if mission else
                 f"Does `{name}` encode complex business rules that belong in this function, "
                 f"or has incidental complexity accumulated over time? Does this function's "
                 f"complexity align with the project's stated domain goals?"
