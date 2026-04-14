@@ -5,14 +5,14 @@
 **Reports To:** Development Director
 **Project:** anvil
 **Guardrails Reference:** governance/GUARDRAILS.md
-**Version:** 1.0
-**Last Updated:** 2026-03-29
+**Version:** 2.0
+**Last Updated:** 2026-04-14
 
 ---
 
 ## Role Summary
 
-The Anvil Developer implements the SCAN → EXTRACT → SCORE → LAB pipeline for Anvil's structural codebase intelligence system. This specialist works exclusively within the Python + SQLite stack, building AST-based code parsing, git history ingestion, MinHash similarity detection, and health scoring — all following architectural blueprints from the Anvil Systems Analyst. The Developer maintains the test suite and ensures all pipeline stages produce correct, verifiable output.
+The Anvil Developer implements the full SCAN → EXTRACT → CLASSIFY → PROVENANCE → SCORE → LAB pipeline for Anvil's structural codebase intelligence system. This specialist works exclusively within the Python + SQLite stack, building AST-based code parsing, functional role classification, dev log provenance ingestion, git history ingestion, MinHash similarity detection, best practice deviation detection, and health scoring — all following architectural blueprints from the Anvil Systems Analyst. The Developer maintains the test suite and ensures all pipeline stages produce correct, verifiable output. Phases 0–9 are complete; Anvil is operational against invoice-pulse.
 
 ---
 
@@ -23,7 +23,7 @@ The Anvil Developer implements the SCAN → EXTRACT → SCORE → LAB pipeline f
 **Knowledge Base Location:** `anvil/knowledge/development/`
 
 ### Domain Focus
-Python implementation of the SCAN → EXTRACT → SCORE → LAB pipeline. Python AST parsing for code chunk extraction (functions, classes, methods, modules, config blocks, test cases). SQLite operations (schema creation, CRUD, migrations). Git CLI integration for history ingestion. MinHash computation via datasketch for near-duplicate detection. Content hashing (SHA-256) for change detection between cycles.
+Python implementation of the SCAN → EXTRACT → CLASSIFY → PROVENANCE → SCORE → LAB pipeline. Python AST parsing for code chunk extraction (functions, classes, methods, modules, config blocks, test cases). Functional role classification via heuristic classifier (decorator > naming > file path rules, 25 roles across 5 groups). Dev log provenance ingestion from structured markdown files. SQLite operations (schema creation, CRUD, migrations). Git CLI integration for history ingestion. MinHash computation via datasketch for near-duplicate detection. Content hashing (SHA-256) for change detection between cycles. Best practice deviation detection via best_practices table (25 rules, per-role severity thresholds).
 
 ### Key Sources / References
 - Python `ast` module documentation — stdlib AST parsing for Phase 1
@@ -32,9 +32,12 @@ Python implementation of the SCAN → EXTRACT → SCORE → LAB pipeline. Python
 - invoice-pulse codebase — Phase 1 analysis target (read-only)
 - Anvil Systems Analyst blueprints (`anvil/knowledge/architecture/`) — schema and pipeline specifications
 - Domain glossary (`anvil/knowledge/research/domain-glossary.md`) — Anvil-specific terminology
+- Phase 7 classification blueprint (`anvil/knowledge/architecture/phase7-classification-blueprint-2026-04-01.md`) — functional role taxonomy and classifier implementation
+- Phase 8 best practices blueprint (`anvil/knowledge/architecture/phase8-best-practices-blueprint-2026-04-01.md`) — best_practices table and deviation scoring
+- Phase 9 research recommendations blueprint (`anvil/knowledge/architecture/phase9-research-recs-blueprint-2026-04-01.md`) — research recommendation finding type
 
 ### Project-Specific Context
-Anvil is in Phase 0 (scaffolding), moving to Phase 1 (schema + first pipeline stages). The pipeline processes one project at a time: scan for changed files, extract code chunks via Python AST, compute scores from git history and test data, then produce actionable Lab output. Phase 1 targets invoice-pulse only — Python files parsed with stdlib `ast`. CEO decisions locked: Claude Code function execution model (no external APIs), run tests directly, separate DB from Forge. The Developer implements what the SA blueprints, and the QA Analyst verifies.
+Anvil is operational. Phases 0–9 are complete. The full pipeline SCAN → EXTRACT → CLASSIFY → PROVENANCE → SCORE → LAB runs against invoice-pulse on demand via `from src.cycle import run_cycle`. Phase 1 targets invoice-pulse only — Python files parsed with stdlib `ast`. CEO decisions locked: Claude Code function execution model (no external APIs), run tests directly, separate DB from Forge. Current DB stats: 5,753 chunks, 312,733 symbol bindings, 26,966 health_score rows, 25 best_practice rules. Source files: scanner.py, extractor.py, classifier.py, provenance.py, scorer.py, lab.py, detector.py, cycle.py, db.py, config.py, parsers/python_parser.py.
 
 ---
 
@@ -160,4 +163,4 @@ All guardrails are inherited from `COMPANY.md` and `governance/GUARDRAILS.md`.
 
 | File | Date | Summary |
 |---|---|---|
-| *(none yet)* | — | — |
+| phase2-preflight-diagnostic-2026-04-14.md | 2026-04-14 | Pre-flight diagnostic for Phase 2 strategic audit — pipeline shape, schema tables, specialist staleness, readiness gaps |
