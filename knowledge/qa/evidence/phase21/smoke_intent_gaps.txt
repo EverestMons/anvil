@@ -1,0 +1,8 @@
+findings: 5
+keys ok: True
+sample finding_type: intent_gap
+sample severity: CRITICAL
+sample signal_type: coverage_gap
+chunk_ids is list: True
+all required keys present: True
+signal types present: ['coupling_hotspot', 'coverage_gap', 'complexity_hotspot']
