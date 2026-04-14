@@ -1,0 +1,29 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/marklehn/Desktop/GitHub/anvil
+plugins: anyio-4.12.1, cov-7.0.0
+collecting ... collected 20 items
+
+tests/test_lab.py::test_find_coverage_gaps PASSED                        [  5%]
+tests/test_lab.py::test_coverage_gaps_excludes_tested PASSED             [ 10%]
+tests/test_lab.py::test_find_coupling_hotspots PASSED                    [ 15%]
+tests/test_lab.py::test_find_clone_candidates PASSED                     [ 20%]
+tests/test_lab.py::test_find_cochange_patterns PASSED                    [ 25%]
+tests/test_lab.py::test_find_staleness_alerts PASSED                     [ 30%]
+tests/test_lab.py::test_find_complexity_hotspots PASSED                  [ 35%]
+tests/test_lab.py::test_planner_constraints_structure PASSED             [ 40%]
+tests/test_lab.py::test_planner_constraints_has_coverage_type PASSED     [ 45%]
+tests/test_lab.py::test_write_cycle_report PASSED                        [ 50%]
+tests/test_lab.py::test_run_lab_end_to_end PASSED                        [ 55%]
+tests/test_lab.py::test_run_lab_unknown_project PASSED                   [ 60%]
+tests/test_lab.py::test_find_intent_gaps_missing_brief PASSED            [ 65%]
+tests/test_lab.py::test_find_intent_gaps_returns_required_keys PASSED    [ 70%]
+tests/test_lab.py::test_extract_project_mission_found PASSED             [ 75%]
+tests/test_lab.py::test_extract_project_mission_not_found PASSED         [ 80%]
+tests/test_lab.py::test_find_intent_gaps_excludes_test_files PASSED      [ 85%]
+tests/test_lab.py::test_is_noise_chunk_test_file PASSED                  [ 90%]
+tests/test_lab.py::test_is_noise_chunk_session_lifecycle PASSED          [ 95%]
+tests/test_lab.py::test_is_noise_chunk_connection_factory PASSED         [100%]
+
+============================== 20 passed in 0.04s ==============================

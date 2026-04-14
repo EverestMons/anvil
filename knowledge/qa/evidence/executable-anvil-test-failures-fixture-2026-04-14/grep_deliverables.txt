@@ -1,0 +1,25 @@
+=== Check (a): grep -n "staleness_score=0.85" tests/test_lab.py ===
+Exit code: 0
+67:                        coupling_score=0.85, staleness_score=0.85,
+
+
+=== Check (b): grep -n "staleness_score=0.7" tests/test_lab.py ===
+Exit code: 1
+(no output — 0 hits, as expected)
+
+=== Check (c): grep -n "staleness=0.85 >= 0.8 threshold" tests/test_lab.py ===
+Exit code: 0
+183:    assert "risky_func" in stale_names  # staleness=0.85 >= 0.8 threshold
+
+
+=== Check (d): grep -n "hash4" tests/test_lab.py ===
+Exit code: 1
+(no output — hash4 is generated dynamically via f"hash{{i}}" at lines 112,114)
+NOTE: The fixture loop at lines 111-115 runs range(5), producing hash0..hash4 for both main.py and utils.py.
+Lines 112-113: create_git_change(conn, pid, "main.py", f"hash{i}", ...)
+Lines 114-115: create_git_change(conn, pid, "utils.py", f"hash{i}", ...)
+Intent satisfied: 5 commits for each file, meeting COCHANGE_MIN_COUNT=5.
+
+=== Check (e): git log -1 ===
+Exit code: 0
+c49f0601e1d51396bee06d9d1a968254dc354cbc fix: realign lab_project fixture thresholds (staleness, cochange)
