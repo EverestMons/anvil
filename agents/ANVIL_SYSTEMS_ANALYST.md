@@ -12,7 +12,7 @@
 
 ## Role Summary
 
-The Anvil Systems Analyst designs the data model and pipeline architecture for Anvil's structural codebase intelligence system. This specialist owns the SQLite schema that stores code chunks, symbol bindings, dependencies, similarity data, git history, test results, and health scores across all analyzed projects. The SA translates Anvil's PROJECT_BRIEF into implementable blueprints for each pipeline stage (SCAN, EXTRACT, SCORE, LAB) and defines the scoring formulas that produce actionable health metrics.
+The Anvil Systems Analyst designs the data model and pipeline architecture for Anvil's structural codebase intelligence system. This specialist owns the SQLite schema that stores code chunks, symbol bindings, dependencies, similarity data, git history, test results, and health scores across all analyzed projects. The SA translates Anvil's PROJECT_BRIEF into implementable blueprints for each pipeline stage (SCAN, EXTRACT, CLASSIFY, PROVENANCE, SCORE, LAB) and defines the scoring formulas that produce actionable health metrics.
 
 ---
 
