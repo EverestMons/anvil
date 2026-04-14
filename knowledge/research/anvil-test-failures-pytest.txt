@@ -1,0 +1,39 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/marklehn/Desktop/GitHub/anvil
+plugins: anyio-4.12.1, cov-7.0.0
+collecting ... collected 2 items
+
+tests/test_lab.py::test_find_cochange_patterns FAILED
+tests/test_lab.py::test_find_staleness_alerts FAILED
+
+=================================== FAILURES ===================================
+_________________________ test_find_cochange_patterns __________________________
+
+conn = <sqlite3.Connection object at 0x1082b7300>, lab_project = (1, 2, 3, 4, 5)
+
+    def test_find_cochange_patterns(conn, lab_project):
+        pid, _, _, _, _ = lab_project
+        patterns = find_cochange_patterns(conn, pid)
+>       assert len(patterns) >= 1
+E       assert 0 >= 1
+E        +  where 0 = len([])
+
+tests/test_lab.py:165: AssertionError
+__________________________ test_find_staleness_alerts __________________________
+
+conn = <sqlite3.Connection object at 0x1082b76c0>, lab_project = (1, 2, 3, 4, 5)
+
+    def test_find_staleness_alerts(conn, lab_project):
+        pid, _, _, _, _ = lab_project
+        alerts = find_staleness_alerts(conn, pid, 1)
+        stale_names = [a["name"] for a in alerts]
+>       assert "risky_func" in stale_names  # staleness=0.7 >= 0.6 threshold
+E       AssertionError: assert 'risky_func' in []
+
+tests/test_lab.py:183: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_lab.py::test_find_cochange_patterns - assert 0 >= 1
+FAILED tests/test_lab.py::test_find_staleness_alerts - AssertionError: assert...
+============================== 2 failed in 0.03s ===============================
