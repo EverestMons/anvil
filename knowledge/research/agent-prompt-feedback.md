@@ -18,6 +18,11 @@
 **Resolution:** Heading pattern expanded to include `What This Project Is`, `About`, `Summary`, `Background`. Re-run confirmed "Given that" present in all findings.
 **Recommendation:** Future project briefs should be aware that `_extract_project_mission` extracts from the first `## Mission`, `## Overview`, `## Purpose`, `## What This Project Is`, `## About`, `## Summary`, or `## Background` heading. If none match, mission context will be absent from findings.
 
+### 2026-04-14 — Diagnostic: table name mismatch in plan query
+**Plan step:** diagnostic-coupling-hotspots-noise — item (3) query.
+**What happened:** The diagnostic plan specified `chunks` and `chunk_scores` as table names. The actual DB uses `code_chunks` and `health_scores`. The query raised `sqlite3.OperationalError: no such table: chunks`. Adapted inline before proceeding.
+**Recommendation:** Future diagnostic plans that embed SQL queries should use the canonical table names: `code_chunks`, `health_scores`, `chunk_dependencies`, `chunk_similarities`. The mismatch suggests the plan was authored from an earlier schema draft.
+
 ### 2026-04-14 — Cycle 11 re-run: cycle_number DB offset
 **Plan step:** Step 1 fix/re-run — re-ran cycle after heading fix.
 **What happened:** The first Cycle 11 run (with empty mission) was stored as cycle_number=11. The fix re-run was stored as cycle_number=12. QA Step 2's DB check queries `WHERE cycle_number=11` — this will return the unfixed run, not the corrected one. The cycle number in cycle_reports does not match the plan name.
