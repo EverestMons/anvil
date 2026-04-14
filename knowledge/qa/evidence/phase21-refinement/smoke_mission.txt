@@ -1,0 +1,3 @@
+Command: python3 -c "from src.lab import _extract_project_mission; r = _extract_project_mission('## Mission\n\nBuild great software.\n\n## Other'); print(repr(r))"
+Output: 'Build great software.'
+Result: non-empty string — PASS

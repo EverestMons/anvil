@@ -26,6 +26,7 @@ Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated
 - **Phase 2.1 Intent Cross-Reference Layer** (2026-04-14) — find_intent_gaps() + write_intent_audit() live. Eighth Lab finding type cross-references structural signals (coverage gaps, coupling hotspots, complexity hotspots) against project intent (PROJECT_BRIEF.md + domain-glossary.md). Deposits audit-findings-{date}.md to target project knowledge/anvil/. invoice-pulse/knowledge/anvil/ deposit folder established. Live smoke test: 5 findings returned (all 3 signal types), all 9 required keys present. QA verified: all 5 areas PASS.
 - **Specialist Sync to Phase 9** (2026-04-14): All three specialist files synced to Phase 9 reality (v2.0).
 - **2026-04-14: Cycle 10 complete** (planned as Cycle 9 — DB auto-incremented; prior cycle 9 existed from earlier session). First production run with Phase 2.1 intent gaps. 20 intent gaps found across CRITICAL(7)/HIGH(1)/MEDIUM(6)/LOW(6). audit-findings deposited to invoice-pulse/knowledge/anvil/.
+- **2026-04-14: Phase 2.1 refinement shipped** — test file filter added to all 3 find_intent_gaps queries, project intent injection via _extract_project_mission added; 2 pre-existing unrelated test failures (test_find_cochange_patterns, test_find_staleness_alerts) noted and carried forward.
 
 ## Diagnostics Completed
 
