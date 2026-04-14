@@ -356,7 +356,10 @@ def _extract_project_mission(brief_text: str) -> str:
     """
     import re
     lines = brief_text.splitlines()
-    heading_pattern = re.compile(r'^##\s+(Mission|Overview|Purpose)\s*$', re.IGNORECASE)
+    heading_pattern = re.compile(
+        r'^##\s+(Mission|Overview|Purpose|What This Project Is|About|Summary|Background)\s*$',
+        re.IGNORECASE,
+    )
     found_heading = False
     paragraph_lines = []
     for line in lines:
