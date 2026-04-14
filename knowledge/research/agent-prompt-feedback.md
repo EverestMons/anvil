@@ -12,3 +12,8 @@
 **What happened:** The plan's find string used arrow notation (`→`) but the file used comma notation `(SCAN, EXTRACT, SCORE, LAB)`. Python find-and-replace silently produced no match; the change was not applied. Caught in Step 2 QA.
 **Recommendation:** Plan prompts should verify the exact text present in the file before specifying a find-and-replace string, or use a broader context anchor (e.g., surrounding sentence) rather than only the pipeline string itself.
 
+### 2026-04-14 — Cycle 11: mission heading mismatch — "Given that" not injected
+**Plan step:** Step 1 — run_cycle then check mission context in what_needs_discovering.
+**What happened:** `_extract_project_mission()` in `src/lab.py` looks for headings `## Mission`, `## Overview`, or `## Purpose`. invoice-pulse's PROJECT_BRIEF.md uses `## What This Project Is`. The function returns empty string; all 20 findings fall back to the non-mission template (references PROJECT_BRIEF conceptually but omits the "Given that {mission}" sentence). QA Step 2 grep-for-"Given that" will return zero matches.
+**Recommendation:** Either (a) expand the heading pattern in `_extract_project_mission` to include common variants like `## What This Project Is`, `## About`, `## Description`, or (b) update the QA check to grep for the actual fallback text. Option (a) is more robust across diverse project briefs.
+
