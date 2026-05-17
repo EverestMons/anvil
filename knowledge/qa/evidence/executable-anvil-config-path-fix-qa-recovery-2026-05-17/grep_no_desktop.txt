@@ -1,0 +1,3 @@
+$ grep -rn "Desktop/GitHub" src/
+(no output — exit code 1, no matches found)
+EXIT_CODE=1

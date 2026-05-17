@@ -1,0 +1,20 @@
+$ python3 -m pytest tests/ -v
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/marklehn/Developer/GitHub/anvil/.bellows-worktrees/anvil-config-path-fix-qa-recovery-2026-05-17
+plugins: anyio-4.12.1, cov-7.0.0
+collected 217 items
+
+tests/test_best_practices.py: 16 passed
+tests/test_classifier.py: 22 passed
+tests/test_cycle.py: 6 passed
+tests/test_db.py: 34 passed
+tests/test_detector.py: 16 passed
+tests/test_extractor.py: 14 passed
+tests/test_lab.py: 22 passed
+tests/test_provenance.py: 12 passed
+tests/test_python_parser.py: 28 passed
+tests/test_scanner.py: 18 passed
+tests/test_scorer.py: 19 passed
+
+============================= 217 passed in 1.03s ==============================

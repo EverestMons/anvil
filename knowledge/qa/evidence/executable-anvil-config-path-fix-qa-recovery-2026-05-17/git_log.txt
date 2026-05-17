@@ -1,0 +1,13 @@
+$ git --no-pager log --oneline -10
+a48f934 docs: deposit config path fix dev log
+74c6dce fix(config): update SCAN_TARGETS and DEV_LOG_PATHS to Developer/GitHub root
+472e011 chore: archive Cycle 13 plan to Done/
+a601c1b docs: Cycle 13 QA report — all checks PASS, findings continuity verified
+8a97575 feat: Anvil Cycle 13 — invoice-pulse fresh run after 33-day staleness
+dd00a4d knowledge: archive anvil cycles 7-16 dev logs + bellows write-race test findings
+076d90a chore: add .gitignore (exclude anvil.db, vexp, caches)
+1676215 docs: prompt feedback — QA manual recovery for anvil test failures
+a7947a4 chore: QA closeout + manual move of stranded anvil test failures fixture plan to Done
+05b5d69 fix: realign lab_project fixture thresholds (staleness, cochange)
+
+SHA 74c6dce confirmed present in main history.

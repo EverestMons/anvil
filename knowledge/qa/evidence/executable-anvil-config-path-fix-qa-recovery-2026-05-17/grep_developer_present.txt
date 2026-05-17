@@ -1,0 +1,4 @@
+$ grep -n "Developer/GitHub" src/config.py
+11:    "invoice-pulse": "/Users/marklehn/Developer/GitHub/invoice-pulse",
+131:    "invoice-pulse": "/Users/marklehn/Developer/GitHub/invoice-pulse/knowledge/development/",
+EXIT_CODE=0
