@@ -1,0 +1,33 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/marklehn/Developer/GitHub/anvil/.bellows-worktrees/f9-follow-scoring-methodology-fix-qa-recovery-2026-05-18
+plugins: anyio-4.12.1, cov-7.0.0
+collecting ... collected 1 item
+
+tests/test_scorer.py::test_composite_volatility_floor_for_zero_coverage FAILED [100%]
+
+=================================== FAILURES ===================================
+______________ test_composite_volatility_floor_for_zero_coverage _______________
+
+    def test_composite_volatility_floor_for_zero_coverage():
+        """Regression test: zero-coverage chunks get a volatility floor (F9-follow fix)."""
+        w = SCORING_WEIGHTS
+        vol, cov, comp, coup, stale = 0.1, 1.0, 0.9, 0.5, 0.0
+
+        # With floor applied (coverage=1.0), composite must be higher than naive calculation
+        result_with_floor = compute_composite(vol, cov, comp, coup, stale, w)
+        naive_composite = (
+            w["volatility"] * vol + w["coverage"] * cov + w["complexity"] * comp
+            + w["coupling"] * coup + w["staleness"] * stale
+        )
+>       assert result_with_floor > naive_composite, (
+            "Floor should raise composite above naive vol=0.1 calculation"
+        )
+E       AssertionError: Floor should raise composite above naive vol=0.1 calculation
+E       assert 0.53 > 0.53
+
+tests/test_scorer.py:269: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_scorer.py::test_composite_volatility_floor_for_zero_coverage
+============================== 1 failed in 0.04s ===============================

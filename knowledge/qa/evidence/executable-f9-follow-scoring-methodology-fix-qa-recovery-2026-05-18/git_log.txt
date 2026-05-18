@@ -1,0 +1,18 @@
+4d5149d docs: QA verdict PASS for F9-follow scoring methodology fix
+155f3d1 feat(scorer): volatility floor for zero-coverage chunks + cov×comp secondary ranking (F9-follow)
+23f87da docs: diagnostic — volatility attribution replay (F9-follow)
+5987f9f chore: session-wrap 2026-05-18 (F9 scoring-weights diagnostic close)
+dbd5ab1 docs: diagnostic — scoring-weights volatility-decay population audit
+7da7f27 chore: untrack .vexp/ files (already gitignored)
+bca7d5e docs: session-wrap PROJECT_STATUS update for 2026-05-18
+35c6b73 docs: open BACKLOG.md with F2 audit findings
+8372aad docs: PROJECT_STATUS update for 2026-05-17 config path fix + halted-original audit evidence
+316513f docs: config path fix QA report — all checks PASS
+
+--- SHA verification ---
+Plan references DEV commit d68191e. On main, the corresponding commit is 155f3d1.
+Tree hash comparison: both resolve to 79fd4a2e62cf1f770236cdde8eed54f748287bb7 (identical content).
+d68191e exists on branch f9-follow-scoring-methodology-fix-2026-05-18.
+155f3d1 is the rebased equivalent on main.
+git diff d68191e 155f3d1 --stat: no differences (zero-diff).
+Conclusion: DEV work is present on main at 155f3d1 with identical tree content.

@@ -1,0 +1,60 @@
+src/lab.py lines 872-928 — Untested Complexity section placement verification
+
+--- Coverage Gaps section (lines 872-886) ---
+
+    # Coverage gaps
+    gaps = findings.get("coverage_gaps", [])
+    lines.append(f"## Coverage Gaps ({len(gaps)} findings)")
+    if gaps:
+        lines.append("| File | Name | Type | Composite | Coverage | Volatility |")
+        lines.append("|---|---|---|---|---|---|")
+        for g in gaps[:30]:
+            lines.append(
+                f"| {g['file_path']} | {g['name']} | {g['chunk_type']} | "
+                f"{g['composite_score']:.3f} | {g['coverage_score']:.2f} | "
+                f"{g['volatility_score']:.2f} |"
+            )
+    else:
+        lines.append("No coverage gaps found.")
+    lines.append("")
+
+--- Untested Complexity section (lines 888-914) ---
+
+    # Untested Complexity — secondary ranking by coverage × complexity
+    # Volatility-independent view; resilient to population collapse / inversion.
+    uc_cur = conn.execute(
+        "SELECT cc.file_path, cc.name, hs.coverage_score, hs.complexity_score, "
+        "hs.composite_score, (hs.coverage_score * hs.complexity_score) AS cov_comp "
+        "FROM health_scores hs "
+        "JOIN code_chunks cc ON hs.chunk_id = cc.id "
+        "WHERE hs.cycle_id = ? AND cc.project_id = ? "
+        "AND cc.chunk_type != 'module' AND cc.chunk_type != 'test_case' "
+        "ORDER BY cov_comp DESC "
+        "LIMIT 20",
+        (cycle_id, project_id),
+    )
+    uc_rows = uc_cur.fetchall()
+    lines.append("## Untested Complexity (top-20 by coverage × complexity)")
+    if uc_rows:
+        lines.append("| File | Name | Coverage | Complexity | Cov×Comp | Composite |")
+        lines.append("|---|---|---|---|---|---|")
+        for row in uc_rows:
+            fp, name, cov_sc, comp_sc, comp_score, cov_comp = row
+            lines.append(
+                f"| {fp} | {name} | {cov_sc:.3f} | {comp_sc:.3f} | "
+                f"{cov_comp:.3f} | {comp_score:.3f} |"
+            )
+    else:
+        lines.append("No untested complexity findings.")
+    lines.append("")
+
+--- Coupling Hotspots section (lines 916-928) ---
+
+    # Coupling hotspots
+    hotspots = findings.get("coupling_hotspots", [])
+    lines.append(f"## Coupling Hotspots ({len(hotspots)} findings)")
+
+--- Verification ---
+(a) Untested Complexity is BETWEEN Coverage Gaps (872) and Coupling Hotspots (916): CONFIRMED
+(b) SQL query filters chunk_type != 'module' AND chunk_type != 'test_case': CONFIRMED (line 896)
+(c) LIMIT 20: CONFIRMED (line 898)

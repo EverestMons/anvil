@@ -1,0 +1,10 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/marklehn/Developer/GitHub/anvil/.bellows-worktrees/f9-follow-scoring-methodology-fix-qa-recovery-2026-05-18
+plugins: anyio-4.12.1, cov-7.0.0
+collecting ... collected 1 item
+
+tests/test_scorer.py::test_composite_volatility_floor_for_zero_coverage PASSED [100%]
+
+============================== 1 passed in 0.01s ===============================

@@ -1,0 +1,44 @@
+def test_composite_volatility_floor_for_zero_coverage():
+    """Regression test: zero-coverage chunks get a volatility floor (F9-follow fix)."""
+    w = SCORING_WEIGHTS
+    vol, cov, comp, coup, stale = 0.1, 1.0, 0.9, 0.5, 0.0
+
+    # With floor applied (coverage=1.0), composite must be higher than naive calculation
+    result_with_floor = compute_composite(vol, cov, comp, coup, stale, w)
+    naive_composite = (
+        w["volatility"] * vol + w["coverage"] * cov + w["complexity"] * comp
+        + w["coupling"] * coup + w["staleness"] * stale
+    )
+    assert result_with_floor > naive_composite, (
+        "Floor should raise composite above naive vol=0.1 calculation"
+    )
+
+    # With coverage=0.0 (well-tested), floor is NOT applied
+    result_no_floor = compute_composite(vol, 0.0, comp, coup, stale, w)
+    naive_no_floor = (
+        w["volatility"] * vol + w["coverage"] * 0.0 + w["complexity"] * comp
+        + w["coupling"] * coup + w["staleness"] * stale
+    )
+    assert abs(result_no_floor - naive_no_floor) < 0.001, (
+        "Floor must not apply when coverage=0.0"
+    )
+
+    # Edge: coverage=0.99 — floor IS applied
+    result_edge = compute_composite(vol, 0.99, comp, coup, stale, w)
+    naive_edge = (
+        w["volatility"] * vol + w["coverage"] * 0.99 + w["complexity"] * comp
+        + w["coupling"] * coup + w["staleness"] * stale
+    )
+    assert result_edge > naive_edge, (
+        "Floor should apply at coverage=0.99 (float-rounding edge)"
+    )
+
+    # Just below threshold: coverage=0.989 — floor NOT applied
+    result_below = compute_composite(vol, 0.989, comp, coup, stale, w)
+    naive_below = (
+        w["volatility"] * vol + w["coverage"] * 0.989 + w["complexity"] * comp
+        + w["coupling"] * coup + w["staleness"] * stale
+    )
+    assert abs(result_below - naive_below) < 0.001, (
+        "Floor must not apply at coverage=0.989"
+    )

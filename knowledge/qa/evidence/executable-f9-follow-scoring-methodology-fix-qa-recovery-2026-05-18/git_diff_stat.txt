@@ -1,0 +1,19 @@
+commit d68191e05d5f3ff04b6e6e5379a1ec746d32fe7c
+Author: Mark Lehn <marklehn@icloud.com>
+Date:   Mon May 18 12:30:12 2026 -0500
+
+    feat(scorer): volatility floor for zero-coverage chunks + cov×comp secondary ranking (F9-follow)
+
+    Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+ .../dev-logs/2026-05-18-f9-follow-scoring-fix.md   | 24 +++++++++
+ src/lab.py                                         | 28 +++++++++++
+ src/scorer.py                                      | 20 +++++++-
+ tests/test_lab.py                                  | 58 ++++++++++++++++++++++
+ tests/test_scorer.py                               | 46 +++++++++++++++++
+ 5 files changed, 175 insertions(+), 1 deletion(-)
+
+--- Scope audit ---
+Expected files: src/scorer.py, src/lab.py, tests/test_scorer.py, tests/test_lab.py, knowledge/dev-logs/2026-05-18-f9-follow-scoring-fix.md
+Actual files:   src/scorer.py, src/lab.py, tests/test_scorer.py, tests/test_lab.py, knowledge/dev-logs/2026-05-18-f9-follow-scoring-fix.md
+Result: MATCH — no unexpected files
