@@ -1,7 +1,7 @@
 # Anvil — Project Status
 
 **Status:** Operational
-**Last Updated:** 2026-05-17
+**Last Updated:** 2026-05-18
 
 ---
 
@@ -33,6 +33,7 @@ Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated
 - **2026-04-14: QA recovery** — (1) Findings noise reduction shipped and closed: `_is_noise_chunk` helper + SQL test-file filters + 3 new tests; cycle report coupling hotspots now signal-dominant; DEV commit d04fa5e. (2) Cycle 11 stranded plan moved to Done (pre-empted by mission-heading re-run as Cycle 12, already executed, no re-run performed).
 - **2026-05-17: Cycle 13 complete** (DB Cycle 17) — first run after 33-day staleness. 14 intent gaps (3 CRITICAL, 7 HIGH, 4 MEDIUM). +338 git changes, +442 chunks ingested. Findings continuity vs Cycle 11 backlog: 3/5 actionable findings still flagged, 2 displaced by new action_queue.py hotspot. Noise reduction effective (0 noise in top 10). QA verified: all checks PASS.
 - **2026-05-17: Config path fix shipped** — `SCAN_TARGETS` and `DEV_LOG_PATHS` in `src/config.py` re-pointed from obsolete `/Users/marklehn/Desktop/GitHub/invoice-pulse` to `/Users/marklehn/Developer/GitHub/invoice-pulse` (lines 11 and 131). Cycle 13 had monkeypatched the path at runtime; this fix makes the change permanent in source. All 217 tests pass. Commit `74c6dce`. Pre-existing silent-failure mode (Anvil running from cron would have returned 0 intent gaps) closed. Reference: `Done/executable-anvil-config-path-fix-qa-recovery-2026-05-17.md`, QA at `knowledge/qa/2026-05-17-config-path-fix-qa.md`. Halted original retained as audit evidence: `halted-executable-anvil-config-path-fix-2026-05-17.md`.
+- **2026-05-18: F2 path-drift audit + BACKLOG opened** — Planner-direct DB audit of `anvil.db` resolved the F2 follow-on from 2026-05-17. Result: operational tables (`projects`, `code_chunks`, `git_changes`, `chunk_provenance`) clean of Desktop drift; drift concentrated in `cycle_reports.report_path` (16 of 17 rows on cycles 1-16). One-shot SQL UPDATE rewrote the 16 Desktop paths to Developer paths; pre-verified all rewritten paths resolve to existing files on disk. `cycle_reports.report_path` has no readers anywhere in the ecosystem (grepped Anvil source/tests, Forge, Bellows, ai-career-digest), so the fix is hygiene rather than bug-fix. **`knowledge/BACKLOG.md` opened** with two entries: (1) `ANVIL_ROOT` worktree-path bug — cycle 17 recorded a `.bellows-worktrees/...` path that disappeared at teardown; root cause is `ANVIL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))` in `src/config.py` resolving inside the worktree; suggested fix mirrors 2026-05-17 F1 hardcode pattern; (2) volatility-decay methodology finding — targeted health-scores query on `dispute_brief` and `run_validation` (invoice-pulse 04-14 CRITICAL findings) showed they fell off the cycle-17 top-N solely because volatility dropped 1.00→0.11 while coverage and complexity were unchanged. Both functions remain zero-coverage, high-complexity; the "improvement" between cycles is an artifact of Anvil's scoring weights, not remediation. Commits: `35c6b73` (anvil BACKLOG + stranded Done plan archive), `2ff2274` (invoice-pulse backlog addendum), governance-root `f697de5` (anvil submodule bump). DB UPDATE is durable but untracked (anvil.db is gitignored).
 
 ## Diagnostics Completed
 
