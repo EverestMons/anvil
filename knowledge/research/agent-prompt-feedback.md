@@ -34,3 +34,14 @@
 **What happened:** The `executable-anvil-test-failures-fixture-2026-04-14` plan was deposited but stranded due to a write-race during the Bellows plan deposit phase. DEV's fix commit (`c49f060`) landed successfully, but the plan was never routed to QA via Bellows. A manual QA bootstrap prompt was used to verify deliverables, run the full test suite, deposit evidence, write the QA report, pass Rule 20, update PROJECT_STATUS.md, and move the plan to Done.
 **Recommendation:** Write-races during plan deposit can strand plans in a limbo state where DEV work is done but QA never executes. When this happens, a manual QA bootstrap prompt can recover the closeout. Consider adding a Bellows health-check that detects plans with completed DEV commits but no QA evidence after a timeout period.
 
+### 2026-05-18 — Diagnostic: working directory mismatch in Bellows worktree
+**Agent:** Anvil Systems Analyst
+**Prompt type:** Bellows-dispatched diagnostic via worktree.
+**What happened:** The diagnostic plan references paths as `anvil/knowledge/...` and `anvil/anvil.db`, but the Bellows worktree root IS the anvil directory (no `anvil/` subdirectory). The DB (`anvil.db`) is not in the worktree at all — it's in the main repo at `/Users/marklehn/Developer/GitHub/anvil/anvil.db`. Agent had to discover this and adapt paths.
+**Recommendation:** Diagnostic plans dispatched through Bellows worktrees should: (1) not assume an `anvil/` prefix in paths — use relative paths from repo root, and (2) explicitly state whether the DB is in the worktree or in the main repo, since worktrees may not include untracked/gitignored files like `.db`.
+
+### 2026-05-18 — Diagnostic: cycle 9 double-count anomaly not pre-documented
+**Agent:** Anvil Systems Analyst
+**What happened:** Cycle 9 has 7,672 health_scores vs. 3,836 for cycles 10-16. The diagnostic had to choose cycle 10 as anchor instead of cycle 9 (the "first production run on 2026-04-14") to avoid data quality issues. This anomaly was not mentioned in PROJECT_STATUS or the BACKLOG entry.
+**Recommendation:** Known data quality issues in the DB should be documented in PROJECT_STATUS or a data-quality knowledge file so that future diagnostics can reference them rather than discovering them ad hoc.
+
