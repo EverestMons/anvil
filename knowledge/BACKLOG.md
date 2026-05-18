@@ -8,6 +8,8 @@ Lightweight capture of mid-session observations and deferred work. Each entry is
 
 ### 2026-05-18 — `ANVIL_ROOT` resolves to worktree path inside Bellows worktrees, breaking `cycle_reports.report_path`
 
+**Closed 2026-05-18:** Fix shipped at commit `86ba5fd` (`src/config.py:6` hardcoded to `/Users/marklehn/Developer/GitHub/anvil`). Production-validated by cycle 18 — audit findings file deposited at canonical main-repo path, not worktree-local. 219/219 tests pass. See `PROJECT_STATUS.md` 2026-05-18 (afternoon) F8 entry.
+
 **Symptom:** Cycle 17 (ran inside a Bellows worktree on 2026-05-17) wrote `report_path = /Users/marklehn/Developer/GitHub/anvil/.bellows-worktrees/anvil-cycle-13-2026-05-20/knowledge/research/cycle-17-findings-2026-05-17.md` to the DB. The worktree is torn down after the cycle completes, so the path is dead-on-arrival — points at a file that no longer exists.
 
 **Root cause:** `src/config.py` defines `ANVIL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))` — derived from `config.py`'s file location at runtime. When Anvil runs from a `.bellows-worktrees/...` checkout, `__file__` resolves inside the worktree, and `ANVIL_ROOT` becomes the worktree path. `lab.py:93–96` then joins that with `knowledge/research/cycle-N-findings-DATE.md` to build the deposit path — which the writer happens to honor for the actual file write (deposit lands inside worktree, gets merged back via Bellows teardown), but the path string recorded in the DB is the pre-merge worktree location.
