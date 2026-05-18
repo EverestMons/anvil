@@ -1,0 +1,22 @@
+7:## TL;DR
+21:## (A) Top-20 Churn
+23:### Functions in BOTH top-20 (13)
+43:### Functions dropped from C18 top-20 (7)
+57:### Functions newly in C18 top-20 (7)
+73:## (B) Floor Recovery Audit
+100:### Summary
+112:## (C) Untested Complexity Section Content Review
+116:### (1) Plausibility assessment
+124:### (2) Noise patterns
+134:### (3) Overlap with Coverage Gaps
+146:### Verdict
+152:## (D) Percentile-Inversion Check
+164:## (E) Coupling / Staleness / Complexity Stability
+178:## Fix Verdict: **PASS**
+192:## Output Receipt
+197:### What Was Done
+200:### Files Deposited
+203:### Files Created or Modified (Code)
+206:### Decisions Made
+211:### Flags for CEO
+215:### Flags for Next Step
