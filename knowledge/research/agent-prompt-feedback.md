@@ -45,3 +45,9 @@
 **What happened:** Cycle 9 has 7,672 health_scores vs. 3,836 for cycles 10-16. The diagnostic had to choose cycle 10 as anchor instead of cycle 9 (the "first production run on 2026-04-14") to avoid data quality issues. This anomaly was not mentioned in PROJECT_STATUS or the BACKLOG entry.
 **Recommendation:** Known data quality issues in the DB should be documented in PROJECT_STATUS or a data-quality knowledge file so that future diagnostics can reference them rather than discovering them ad hoc.
 
+### 2026-05-18 — Diagnostic: volatility-attribution-replay plan quality — strong
+**Agent:** Anvil Systems Analyst
+**Prompt type:** Bellows-dispatched diagnostic via worktree.
+**What happened:** The plan was well-structured and specific. The 8-part investigation sequence was logical and the verification step (part 2) was critical — it caught potential replay errors before the analysis began. The classification thresholds (SELF_DECAYED: raw_delta ≤ -50%, DISPLACED: |raw_delta| < 20%) were reasonable but unnecessary — the actual data was so extreme (79-100% raw drops across all 20 chunks) that any reasonable threshold would have produced the same result.
+**Minor issue:** The plan specified that raw volatility is "typically a commit count or weighted commit-recency sum" — the scorer actually uses a linear-decay weighted sum (`max(0, 1 - days_ago/28)`), which is meaningfully different from a simple commit count. The plan's instruction to "read scorer.py before writing replay queries" correctly anticipated this.
+**No path issues:** The worktree path issue noted in the previous entry also applied here. The DB was at `/Users/marklehn/Developer/GitHub/anvil/anvil.db`, not in the worktree.
