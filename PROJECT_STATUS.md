@@ -1,7 +1,7 @@
 # Anvil — Project Status
 
 **Status:** Operational
-**Last Updated:** 2026-04-14
+**Last Updated:** 2026-05-17
 
 ---
 
@@ -32,6 +32,7 @@ Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated
 - **2026-04-14: Findings noise reduction shipped** — `_is_noise_chunk` helper added; test-file filter applied to `find_coupling_hotspots`, `find_coverage_gaps`, `find_complexity_hotspots` via SQL; session-lifecycle and connection-factory suppression applied to all 4 finding functions via Python helper. Cycle report coupling hotspots now signal-dominant.
 - **2026-04-14: QA recovery** — (1) Findings noise reduction shipped and closed: `_is_noise_chunk` helper + SQL test-file filters + 3 new tests; cycle report coupling hotspots now signal-dominant; DEV commit d04fa5e. (2) Cycle 11 stranded plan moved to Done (pre-empted by mission-heading re-run as Cycle 12, already executed, no re-run performed).
 - **2026-05-17: Cycle 13 complete** (DB Cycle 17) — first run after 33-day staleness. 14 intent gaps (3 CRITICAL, 7 HIGH, 4 MEDIUM). +338 git changes, +442 chunks ingested. Findings continuity vs Cycle 11 backlog: 3/5 actionable findings still flagged, 2 displaced by new action_queue.py hotspot. Noise reduction effective (0 noise in top 10). QA verified: all checks PASS.
+- **2026-05-17: Config path fix shipped** — `SCAN_TARGETS` and `DEV_LOG_PATHS` in `src/config.py` re-pointed from obsolete `/Users/marklehn/Desktop/GitHub/invoice-pulse` to `/Users/marklehn/Developer/GitHub/invoice-pulse` (lines 11 and 131). Cycle 13 had monkeypatched the path at runtime; this fix makes the change permanent in source. All 217 tests pass. Commit `74c6dce`. Pre-existing silent-failure mode (Anvil running from cron would have returned 0 intent gaps) closed. Reference: `Done/executable-anvil-config-path-fix-qa-recovery-2026-05-17.md`, QA at `knowledge/qa/2026-05-17-config-path-fix-qa.md`. Halted original retained as audit evidence: `halted-executable-anvil-config-path-fix-2026-05-17.md`.
 
 ## Diagnostics Completed
 
