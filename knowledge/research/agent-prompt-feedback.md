@@ -57,3 +57,15 @@
 **Prompt type:** Bellows-dispatched QA recovery via worktree.
 **What happened:** The plan references DEV commit `d68191e`, but on main the equivalent commit is `155f3d1` (rebased). Tree hashes are identical (`79fd4a2`), `git diff` between them is empty. The SHA `d68191e` exists on branch `f9-follow-scoring-methodology-fix-2026-05-18` but is not an ancestor of HEAD/main. Check (6) ("commit landed on main") required interpreting "present" as "content-equivalent commit present" rather than exact SHA match.
 **Recommendation:** When Bellows worktrees rebase feature branches onto main, the plan's DEV commit SHA may no longer match main's history. QA plans that reference a specific SHA for verification should either: (1) include the main-branch SHA as a fallback, or (2) specify tree-hash verification as an acceptable alternative to exact SHA matching.
+
+### 2026-05-18 — Cycle 18: DB schema column name mismatch in plan queries
+**Agent:** Anvil Developer
+**Plan step:** Step 1 — pre-cycle snapshot query uses `project='invoice-pulse'` column filter.
+**What happened:** The plan's baseline snapshot query filters on `WHERE project='invoice-pulse'`, but all tables use `project_id` (integer FK to `projects` table), not a `project` text column. Similarly, the plan references `cycle_date` on `cycle_reports` which doesn't exist — the actual columns are `started_at` and `completed_at`. Also, `health_scores` uses `cycle_id` not `cycle_number`. Adapted inline using `project_id=1` and `completed_at`.
+**Recommendation:** Plan queries should use the actual schema: `project_id` (FK), `cycle_id`, `started_at`/`completed_at`. Consider a canonical query-snippet library in the plan template.
+
+### 2026-05-18 — Cycle 18: Floor violation query checks wrong column
+**Agent:** Anvil Developer
+**Plan step:** Step 1 check (7) — volatility floor sanity query.
+**What happened:** The plan queries `WHERE coverage_score >= 0.99 AND volatility_score < 0.5` expecting zero rows. Returns 1,543 rows. The floor is applied inside `compute_composite()` and affects the resulting `composite_score`, but the stored `volatility_score` column retains the raw percentile-normalized value. The floor is working correctly — verified by manual recomputation of 10 sample composites (all match floor-applied formula). The query tests the wrong column.
+**Recommendation:** Future plans should verify floor behavior by recomputing composites rather than checking stored dimension scores. The volatility_score column is the raw percentile, not the floored value.
