@@ -1,0 +1,3 @@
+9:### 2026-05-18 — `ANVIL_ROOT` resolves to worktree path inside Bellows worktrees, breaking `cycle_reports.report_path`
+29:### 2026-05-18 — Volatility-weighted composite scores cause findings to "self-resolve" when commit activity tapers
+59:### 2026-05-18 — Percentile normalization can invert volatility direction during extreme population collapse

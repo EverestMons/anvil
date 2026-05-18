@@ -1,0 +1,16 @@
+commit bab1e676a9c573dcfe0786b192cead26566ce694
+Author: Mark Lehn <marklehn@icloud.com>
+Date:   Mon May 18 14:12:01 2026 -0500
+
+    docs: add BACKLOG entry for percentile-normalization inversion edge case
+    
+    Captures the methodology finding from the F9-follow attribution replay:
+    percentile normalization can invert volatility signal direction when
+    inter-cycle gaps exceed ~14 days and population commit activity collapses.
+    Documents triggering conditions and suggested mitigations for future
+    scoring decisions.
+    
+    Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+ knowledge/BACKLOG.md | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
