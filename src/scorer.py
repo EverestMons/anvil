@@ -17,6 +17,12 @@ from src.config import (
     GIT_HISTORY_WEEKS, SCAN_TARGETS, SCORING_WEIGHTS, ROLE_SCORING_WEIGHTS,
 )
 
+# Floor applied to volatility when computing composite for zero-coverage chunks.
+# Untested code cannot be considered low-volatility regardless of commit history.
+# See: scoring-weights-volatility-decay-audit-2026-05-18.md (F9)
+#      volatility-attribution-replay-2026-05-18.md (F9-follow)
+ZERO_COVERAGE_VOLATILITY_FLOOR = 0.5
+
 
 def score_project(conn, project_name: str, cycle_id: int) -> dict:
     """
@@ -312,7 +318,19 @@ def compute_staleness(conn, chunk_id: int, file_path: str,
 def compute_composite(volatility: float, coverage: float, complexity: float,
                       coupling: float, staleness: float,
                       weights: dict) -> float:
-    """Weighted combination of dimension scores. Clamped to 0.0-1.0."""
+    """
+    Weighted combination of dimension scores. Clamped to 0.0-1.0.
+
+    Volatility floor: when coverage >= 0.99 (zero-coverage chunk), volatility
+    is raised to at least ZERO_COVERAGE_VOLATILITY_FLOOR before weighting.
+    Rationale: untested code can't be considered low-volatility no matter how
+    stable its commit history — low activity on uncovered code signals neglect,
+    not safety. The 0.99 threshold (not strict 1.0) handles float rounding from
+    upstream round(score, 4). See F9 + F9-follow diagnostics.
+    """
+    if coverage >= 0.99:
+        volatility = max(volatility, ZERO_COVERAGE_VOLATILITY_FLOOR)
+
     composite = (
         weights["volatility"] * volatility
         + weights["coverage"] * coverage

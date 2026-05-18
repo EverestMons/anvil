@@ -414,3 +414,61 @@ def test_is_noise_chunk_session_lifecycle():
 
 def test_is_noise_chunk_connection_factory():
     assert _is_noise_chunk({"name": "get_connection", "file_path": "database.py"}) is True
+
+
+# --- Untested Complexity section ---
+
+def test_cycle_report_includes_untested_complexity(conn, tmp_path):
+    """Cycle report must include Untested Complexity section with correct ordering."""
+    pid = create_project(conn, "uc-test", "/tmp/uc-test")
+
+    # High-complexity zero-coverage chunk
+    c_high = create_chunk(
+        conn, project_id=pid, file_path="core.py", chunk_type="function",
+        name="complex_untested", content="def complex_untested(): pass",
+        content_hash="uc_h1", start_line=1, end_line=10,
+    )
+    create_health_score(
+        conn, c_high, cycle_id=1, volatility_score=0.5,
+        coverage_score=1.0, complexity_score=0.95,
+        coupling_score=0.3, staleness_score=0.1,
+        composite_score=0.6,
+    )
+
+    # Lower-complexity zero-coverage chunk
+    c_low = create_chunk(
+        conn, project_id=pid, file_path="helpers.py", chunk_type="function",
+        name="simple_untested", content="def simple_untested(): pass",
+        content_hash="uc_h2", start_line=1, end_line=3,
+    )
+    create_health_score(
+        conn, c_low, cycle_id=1, volatility_score=0.3,
+        coverage_score=1.0, complexity_score=0.5,
+        coupling_score=0.1, staleness_score=0.0,
+        composite_score=0.35,
+    )
+
+    findings = {
+        "coverage_gaps": [], "coupling_hotspots": [], "clone_candidates": [],
+        "staleness_alerts": [], "complexity_hotspots": [],
+        "cochange_patterns": [], "best_practice_deviations": [],
+        "intent_gaps": [],
+    }
+    specialist_data = generate_specialist_update_data(conn, pid)
+    report_path = str(tmp_path / "uc-report.md")
+
+    write_cycle_report(
+        conn, "uc-test", 1, findings, [], specialist_data,
+        report_path, "2026-05-18T10:00:00",
+    )
+
+    with open(report_path, "r") as f:
+        content = f.read()
+
+    assert "## Untested Complexity" in content
+    # Higher cov×comp chunk should appear before lower one
+    pos_high = content.index("complex_untested")
+    pos_low = content.index("simple_untested")
+    assert pos_high < pos_low, (
+        "complex_untested (cov×comp=0.95) must appear before simple_untested (cov×comp=0.50)"
+    )

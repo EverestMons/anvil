@@ -885,6 +885,34 @@ def write_cycle_report(conn, project_name: str, cycle_id: int,
         lines.append("No coverage gaps found.")
     lines.append("")
 
+    # Untested Complexity — secondary ranking by coverage × complexity
+    # Volatility-independent view; resilient to population collapse / inversion.
+    uc_cur = conn.execute(
+        "SELECT cc.file_path, cc.name, hs.coverage_score, hs.complexity_score, "
+        "hs.composite_score, (hs.coverage_score * hs.complexity_score) AS cov_comp "
+        "FROM health_scores hs "
+        "JOIN code_chunks cc ON hs.chunk_id = cc.id "
+        "WHERE hs.cycle_id = ? AND cc.project_id = ? "
+        "AND cc.chunk_type != 'module' AND cc.chunk_type != 'test_case' "
+        "ORDER BY cov_comp DESC "
+        "LIMIT 20",
+        (cycle_id, project_id),
+    )
+    uc_rows = uc_cur.fetchall()
+    lines.append("## Untested Complexity (top-20 by coverage × complexity)")
+    if uc_rows:
+        lines.append("| File | Name | Coverage | Complexity | Cov×Comp | Composite |")
+        lines.append("|---|---|---|---|---|---|")
+        for row in uc_rows:
+            fp, name, cov_sc, comp_sc, comp_score, cov_comp = row
+            lines.append(
+                f"| {fp} | {name} | {cov_sc:.3f} | {comp_sc:.3f} | "
+                f"{cov_comp:.3f} | {comp_score:.3f} |"
+            )
+    else:
+        lines.append("No untested complexity findings.")
+    lines.append("")
+
     # Coupling hotspots
     hotspots = findings.get("coupling_hotspots", [])
     lines.append(f"## Coupling Hotspots ({len(hotspots)} findings)")
