@@ -1,0 +1,2 @@
+6:ANVIL_ROOT = "/Users/marklehn/Developer/GitHub/anvil"
+8:ANVIL_DB_PATH = os.path.join(ANVIL_ROOT, "anvil.db")

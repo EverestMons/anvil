@@ -1,0 +1,10 @@
+86ba5fd fix(config): hardcode ANVIL_ROOT to canonical main-repo path (F8 close-out)
+bc18daf chore: session wrap 2026-05-18 — F9-follow attribution + scoring fix lifecycle artifacts
+27725ee docs: QA recovery report for F9-follow scoring methodology fix (Rule 20 compliant)
+4d5149d docs: QA verdict PASS for F9-follow scoring methodology fix
+155f3d1 feat(scorer): volatility floor for zero-coverage chunks + cov×comp secondary ranking (F9-follow)
+23f87da docs: diagnostic — volatility attribution replay (F9-follow)
+5987f9f chore: session-wrap 2026-05-18 (F9 scoring-weights diagnostic close)
+dbd5ab1 docs: diagnostic — scoring-weights volatility-decay population audit
+7da7f27 chore: untrack .vexp/ files (already gitignored)
+bca7d5e docs: session-wrap PROJECT_STATUS update for 2026-05-18

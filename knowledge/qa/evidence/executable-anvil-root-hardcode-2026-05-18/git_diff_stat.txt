@@ -1,0 +1,11 @@
+commit 86ba5fd5e118b4342af739f67034869bb23690c2
+Author: Mark Lehn <marklehn@icloud.com>
+Date:   Mon May 18 13:42:11 2026 -0500
+
+    fix(config): hardcode ANVIL_ROOT to canonical main-repo path (F8 close-out)
+
+    Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+ .../2026-05-18-anvil-root-hardcode-dev-log.md      | 89 ++++++++++++++++++++++
+ src/config.py                                      |  2 +-
+ 2 files changed, 90 insertions(+), 1 deletion(-)
