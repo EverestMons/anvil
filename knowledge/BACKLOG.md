@@ -53,3 +53,29 @@ Zero coverage gap unchanged. High complexity unchanged. Only volatility moved �
 **Risk:** Methodology, not code. No urgency, but every audit cycle that runs without this fix produces a report that overstates progress. Worth picking up when there's appetite for tuning the scoring engine — likely paired with the Phase 2.x refinements that introduced role-specific thresholds.
 
 **Priority:** Medium — affects every audit report Anvil produces.
+
+---
+
+### 2026-05-18 — Percentile normalization can invert volatility direction during extreme population collapse
+
+**Symptom:** During the F9-follow attribution replay, the `action_queue` function (web/action_queue.py) demonstrated a percentile-normalization inversion: raw volatility dropped 79% (weighted score 9.32 → 2.00, commits 13 → 3 in the 4-week window) yet the percentile-normalized `volatility_score` *increased* from 0.83 to 1.00. The function's true change-frequency risk dropped substantially, but the scorer ranked it as maximally volatile.
+
+**Root cause:** Percentile normalization is a *relative* ranking. The scorer computes `volatility_score` as the percentile rank of `volatility_raw` within the cycle's population — there is no absolute scale anchor. When the population distribution collapses (most files go quiet while a few maintain modest activity), surviving files rank higher in percentile terms even if their absolute activity dropped. In the action_queue case, 83% of the population had zero commits by cycle 17 (down from only 4% at cycle 10), so 3 commits was enough to reach the 100th percentile despite being an absolute decline.
+
+**Impact assessment:** Edge case, not a population-level effect. The cycle 17→18 comparison (1-day inter-cycle gap) showed **zero inversions** across the full chunk population. The 1-day gap shifted the 4-week rolling window by ~1 day, producing no meaningful population distribution shift. The action_queue inversion was driven specifically by the 33-day gap between cycles 10→17, during which the invoice-pulse project's overall commit activity collapsed from 212/220 files active (96%) to 38/225 files active (17%). Under normal inter-cycle intervals (days, not weeks), the effect does not manifest. See `knowledge/research/cycle-18-comparison-memo-2026-05-18.md`, axis D.
+
+**Triggering condition:** Inversion is expected when (a) the inter-cycle gap exceeds ~14 days AND (b) the project's overall commit activity is collapsing or has collapsed (>50% of the file population dropping to zero raw volatility between the two cycles). Future scoring decisions should not rely on percentile stability under either condition. The 33-day gap that produced the observed inversion far exceeded the ~14-day threshold; a 1-day gap produced zero inversions.
+
+**Suggested mitigations if pursued:**
+- (a) **Cap percentile drift between cycles** — e.g., max ±0.3 change per cycle, preventing single-cycle normalization jumps from obscuring the raw signal direction.
+- (b) **Persist absolute raw-volatility scale** — raw volatility is already computed (`compute_volatility` in scorer.py) but not persisted as a separate column in `health_scores`. Storing it alongside the percentile-normalized score would allow downstream consumers to detect inversions directly.
+- (c) **Z-score normalization option** — offer an alternative scoring mode that uses Z-scores instead of percentile ranks for long-gap cycles, preserving directional fidelity when the population distribution is non-stationary.
+- (d) **Population-collapse warning** — emit a warning when a cycle is being scored against a population that has collapsed by >50% vs the prior cycle, alerting the operator that percentile scores may not be directionally comparable.
+
+**Risk:** Documentation only. Adding this entry does not change any code or scoring behavior. If a future plan addresses any of the suggested mitigations, that plan's risk would be evaluated separately.
+
+**Priority:** Low. The (d2) volatility floor and (c) Untested Complexity backup view (shipped 2026-05-18 morning as part of the F9-follow scoring fix) already address the practical problem of zero-coverage chunks being incorrectly displaced. The inversion case is now diagnostic context for future scoring methodology decisions, not an active failure mode.
+
+**Cross-reference:**
+- `knowledge/research/volatility-attribution-replay-2026-05-18.md` — originating audit; section (5) documents the action_queue inversion, section (6) documents the population-wide collapse.
+- `knowledge/research/cycle-18-comparison-memo-2026-05-18.md` — production confirmation; axis D confirms zero inversions under a 1-day inter-cycle gap.
