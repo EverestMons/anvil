@@ -4,6 +4,8 @@
 **Blueprint:** `knowledge/architecture/intent-gap-phantom-fix-blueprint-2026-06-03.md`
 **Dev Log:** `knowledge/development/intent-gap-phantom-fix-2026-06-03.md`
 
+> **Correction (2026-06-03):** §(b) check 7 and §(d) below overstate the population change and mislabel five "displaced findings." Follow-up diagnostic `knowledge/research/scoring-population-discontinuity-2026-06-03.md` established the real scored-population delta as **4,175 → 3,688 (487, 11.7%)**, not ~5,700→3,688 / ~2,000. The five functions (`execute`/`commit`/`close`, `_get_db`, `get_connection`) are noise-filtered by `_is_noise_chunk()` and were never in `find_intent_gaps()` output — the delta query omitted the noise filter. The PASS verdict and phantom-elimination result are unaffected.
+
 ## Summary Recommendation: PASS
 
 All deliverables verified. Phantom elimination confirmed against the live DB. All 229 tests pass. Legitimate findings preserved with expected threshold/ordering shifts.
