@@ -81,3 +81,9 @@
 **Plan step:** Step 3 — blueprint verification check 8 (module chunks stamped).
 **What happened:** Blueprint §7 check 8 predicted ~2,435 module chunks stamped (matching on-disk file count). Actual: 252. The extractor only iterates `.py` module chunks (`py_modules = [m for m in module_chunks if m["file_path"].endswith(".py")]`), not all modules. The 2,435 includes ~2,180 non-Python files (JSON, HTML, MD). This is not a bug — non-Python modules have no function-level children and are excluded from scoring. But the verification check's expected value was wrong.
 **Recommendation:** Blueprint verification checks that reference module-chunk counts should distinguish Python modules (~250) from total modules (~4,000+). The extractor's `.py` filter is the controlling factor.
+
+### 2026-06-03 — Diagnostic: population discontinuity — "displaced" findings were noise-filtered
+**Agent:** Anvil Systems Analyst
+**Plan step:** Step 1 — classify five displaced coupling findings.
+**What happened:** The plan's Context stated "Five legitimate cycle-19 coupling findings displaced from cycle 20" based on the QA findings_delta (Step 3 of the phantom fix plan). Investigation revealed all five are caught by `_is_noise_chunk()` (session-lifecycle and connection-factory patterns, added 2026-04-14) and were never in `find_intent_gaps()` output at either cycle. The "displacement" was an artifact of the QA delta analysis using raw SQL without the noise filter. The diagnostic's core question ("are those five genuinely lower-risk or merely displaced?") was moot.
+**Recommendation:** QA delta analyses comparing find_intent_gaps across cycles should call the actual function (or replay its noise filter in SQL) rather than raw top-N queries. The noise filter is a Python-level post-filter that silently removes high-coupling chunks matching session/connection patterns — raw SQL overstates the coupling-finding count.
