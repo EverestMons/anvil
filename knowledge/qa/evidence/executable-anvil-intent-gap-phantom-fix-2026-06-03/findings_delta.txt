@@ -1,0 +1,50 @@
+=== Cycle 19 raw query results (no freshness guard) ===
+
+Coverage gaps (top 6):
+  get_invoice_prompt (copilot_prompts.py)
+  get_prompt_for_queue (copilot_prompts.py)
+  __init__ (copilot_prompts.py)
+  list_prompts (copilot_prompts.py)
+  PromptDef (copilot_prompts.py)
+  get_all_sections (copilot_prompts.py)
+
+Coupling hotspots (top 6):
+  execute (profile_ingestion.py)
+  commit (profile_ingestion.py)
+  close (profile_ingestion.py)
+  create_contract_tables (contract_tables.py)
+  _get_db (web/action_queue.py)
+  get_connection (database.py)
+
+Complexity hotspots (top 8):
+  invoice_detail (app.py)
+  InvoiceXMLParser (ingestion/xml_parser.py)
+  _validate_contract_json (web/contract_import.py)
+  rates_grid (web/rates.py) *** PHANTOM ***
+  _build_dashboard_cards (web/contracts.py)
+  contract_fuel_import_combined (web/contracts.py)
+  gate_7_linehaul (engines/validator.py)
+  import_contract_setup (web/gap_dashboard.py) *** PHANTOM ***
+
+Cycle 19 total: 20 (2 phantoms, 18 legitimate)
+Cycle 20 total: 15 (0 phantoms)
+
+Cycle-19 non-phantom findings present in cycle 20:
+  get_invoice_prompt (copilot_prompts.py) — PRESENT
+  get_prompt_for_queue (copilot_prompts.py) — PRESENT
+  __init__ (copilot_prompts.py) — PRESENT
+  list_prompts (copilot_prompts.py) — PRESENT
+  PromptDef (copilot_prompts.py) — PRESENT
+  get_all_sections (copilot_prompts.py) — PRESENT
+  execute (profile_ingestion.py) — ABSENT (threshold/ordering shift)
+  commit (profile_ingestion.py) — ABSENT (threshold/ordering shift)
+  close (profile_ingestion.py) — ABSENT (threshold/ordering shift)
+  create_contract_tables (contract_tables.py) — PRESENT
+  _get_db (web/action_queue.py) — ABSENT (threshold/ordering shift)
+  get_connection (database.py) — ABSENT (threshold/ordering shift)
+  invoice_detail (app.py) — PRESENT
+  InvoiceXMLParser (ingestion/xml_parser.py) — PRESENT
+  _validate_contract_json (web/contract_import.py) — PRESENT
+  _build_dashboard_cards (web/contracts.py) — PRESENT
+  contract_fuel_import_combined (web/contracts.py) — PRESENT
+  gate_7_linehaul (engines/validator.py) — PRESENT

@@ -1,0 +1,20 @@
+=== db.py: CREATE TABLE last_seen_cycle ===
+49:            last_seen_cycle INTEGER
+260:    # Migration: add last_seen_cycle column if not present
+262:        conn.execute("ALTER TABLE code_chunks ADD COLUMN last_seen_cycle INTEGER")
+
+=== extractor.py: stamping paths ===
+66:            "UPDATE code_chunks SET last_seen_cycle = ? WHERE id = ?",
+96:                    # Path D: unchanged chunk — stamp last_seen_cycle
+98:                        "UPDATE code_chunks SET last_seen_cycle = ? WHERE id = ?",
+123:                    last_seen_cycle=cycle_id,
+229:        "last_seen_cycle = ? WHERE id = ?",
+
+=== scorer.py: scoping ===
+39:    # Load current-snapshot non-module chunks (last_seen_cycle = this cycle)
+43:        "AND last_seen_cycle = ?",
+
+=== lab.py: guard ===
+474:        "AND cc.last_seen_cycle = ? "
+530:        "AND cc.last_seen_cycle = ? "
+585:        "AND cc.last_seen_cycle = ? "

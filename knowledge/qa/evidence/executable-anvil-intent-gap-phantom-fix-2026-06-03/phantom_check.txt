@@ -1,0 +1,20 @@
+=== Cycle 20 find_intent_gaps results ===
+Total findings: 15
+
+  get_invoice_prompt (copilot_prompts.py) — coverage_gap
+  __init__ (copilot_prompts.py) — coverage_gap
+  get_prompt_for_queue (copilot_prompts.py) — coverage_gap
+  list_prompts (copilot_prompts.py) — coverage_gap
+  PromptDef (copilot_prompts.py) — coverage_gap
+  get_all_sections (copilot_prompts.py) — coverage_gap
+  create_contract_tables (contract_tables.py) — coupling_hotspot
+  invoice_detail (app.py) — complexity_hotspot
+  InvoiceXMLParser (ingestion/xml_parser.py) — complexity_hotspot
+  _validate_contract_json (web/contract_import.py) — complexity_hotspot
+  _build_dashboard_cards (web/contracts.py) — complexity_hotspot
+  contract_fuel_import_combined (web/contracts.py) — complexity_hotspot
+  gate_7_linehaul (engines/validator.py) — complexity_hotspot
+  gate_9_accessorials (engines/validator.py) — complexity_hotspot
+  team_dashboard (app.py) — complexity_hotspot
+
+PASS: No phantom functions found in cycle-20 results

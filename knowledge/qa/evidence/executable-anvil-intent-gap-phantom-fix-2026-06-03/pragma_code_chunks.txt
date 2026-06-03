@@ -1,0 +1,16 @@
+0|id|INTEGER|0||1
+1|project_id|INTEGER|1||0
+2|file_path|TEXT|1||0
+3|chunk_type|TEXT|1||0
+4|name|TEXT|1||0
+5|content|TEXT|1||0
+6|content_hash|TEXT|1||0
+7|start_line|INTEGER|1||0
+8|end_line|INTEGER|1||0
+9|parent_chunk_id|INTEGER|0||0
+10|created_at|TEXT|1|datetime('now')|0
+11|updated_at|TEXT|1|datetime('now')|0
+12|cycle_id|INTEGER|0||0
+13|structural_metadata|TEXT|0||0
+14|functional_role|TEXT|0||0
+15|last_seen_cycle|INTEGER|0||0

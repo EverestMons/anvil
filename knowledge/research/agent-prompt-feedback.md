@@ -75,3 +75,9 @@
 **Plan step:** Step 1 — phantom class assignment for `rates_grid` / `web/rates.py`.
 **What happened:** The plan classified `rates_grid` as a "deleted file (whole file removed in Phase 4 kill-dead-rate-routes)" to test mechanism (a2). Investigation revealed `web/rates.py` still exists on disk (443 lines, rebuilt in commit `769e420`). The function `rates_grid` was removed during the rebuild, but the file survives — making this an (a1) case, not (a2). Consequently, the diagnostic had no (a2) specimen and could not empirically test the deleted-file mechanism.
 **Recommendation:** Future diagnostics that need a deleted-file specimen should verify file non-existence before plan authoring (e.g., `ls invoice-pulse/web/rates.py`). To test (a2), find a file_path in `code_chunks` that does not exist on disk — a simple set-difference query against `discover_files()` output would identify true candidates.
+
+### 2026-06-03 — Fix plan: blueprint §7 check 8 module count estimate off by ~10x
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 3 — blueprint verification check 8 (module chunks stamped).
+**What happened:** Blueprint §7 check 8 predicted ~2,435 module chunks stamped (matching on-disk file count). Actual: 252. The extractor only iterates `.py` module chunks (`py_modules = [m for m in module_chunks if m["file_path"].endswith(".py")]`), not all modules. The 2,435 includes ~2,180 non-Python files (JSON, HTML, MD). This is not a bug — non-Python modules have no function-level children and are excluded from scoring. But the verification check's expected value was wrong.
+**Recommendation:** Blueprint verification checks that reference module-chunk counts should distinguish Python modules (~250) from total modules (~4,000+). The extractor's `.py` filter is the controlling factor.

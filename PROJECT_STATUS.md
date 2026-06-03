@@ -1,7 +1,7 @@
 # Anvil — Project Status
 
 **Status:** Operational
-**Last Updated:** 2026-06-02 (cycle 19)
+**Last Updated:** 2026-06-03 (cycle 20)
 
 ---
 
@@ -10,6 +10,8 @@
 Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated against invoice-pulse. Cross-validated against specialist file facts (10/10 PASS). Findings quality assessed — coverage gaps are highest-value (81% signal), Planner integration protocol defined.
 
 ## Completed Milestones
+
+- **2026-06-03: Intent-gap phantom-function fix shipped (last_seen_cycle)** — Diagnostic named the mechanism: stale orphan chunks in surviving files (a1), uniform across all 5 phantoms. Extractor upserts present functions but never pruned removed ones; scorer scored all chunks indiscriminately; find_intent_gaps had no freshness gate. Fix: added `last_seen_cycle INTEGER` column to `code_chunks`, stamped during extraction (4 paths including unchanged-chunk trap), scoped scorer to `last_seen_cycle = cycle_id`, added belt-and-suspenders guard to all 3 find_intent_gaps query buckets. Non-destructive (philosophy A) — no DELETEs, all historical data preserved. (a2) population sized at 1,599 orphan module chunks (only 1 production Python file); deferred to BACKLOG since last_seen_cycle handles at filter level. Cycle 20 validated: 3,688 chunks scored (down from ~5,700+ with phantoms), 15 findings (0 phantoms vs 2 in cycle 19), all 5 named phantom chunk_ids unstamped (NULL). 229 tests pass (10 new). QA PASS. SA blueprint: `knowledge/architecture/intent-gap-phantom-fix-blueprint-2026-06-03.md`. Diagnostic: `knowledge/research/intent-gap-phantom-mechanism-2026-06-03.md`. Plan: `executable-anvil-intent-gap-phantom-fix-2026-06-03.md`.
 
 - **2026-06-02: Cycle 19 complete** (DB cycle_number 19) — routine on-demand cycle vs invoice-pulse, dispatched via Bellows. 15 intent gaps (4 CRITICAL / 4 HIGH / 2 MEDIUM / 5 LOW), 2114 total findings, 238 constraints, +470 chunks, 72s. 2 phantom findings in the top-10 (`rates_grid` deleted, `import_contract_setup` renamed) caught by an in-plan phantom-function check. Curated to 8 actionable items in `invoice-pulse/knowledge/research/anvil-findings-backlog-2026-06-03.md` (the `copilot_prompts.py` cluster of 6 collapsed to 1; A1 is recurring 2026-04-14 debt). Bellows run hit 3 plan-authoring gate failures (missing `Dispatch Mode` per Rule 35; deposit declared with local date vs `run_cycle` UTC file naming; canonical-path cycle report dirtied main during teardown) — recovered via manual close (stop verdict + Planner Done move). Deliverables on main: 5d45f4c (report), 46b8c4d (dev log), c40f5d6 (plan to Done). Template fixes captured in BACKLOG.
 
