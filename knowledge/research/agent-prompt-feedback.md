@@ -69,3 +69,9 @@
 **Plan step:** Step 1 check (7) — volatility floor sanity query.
 **What happened:** The plan queries `WHERE coverage_score >= 0.99 AND volatility_score < 0.5` expecting zero rows. Returns 1,543 rows. The floor is applied inside `compute_composite()` and affects the resulting `composite_score`, but the stored `volatility_score` column retains the raw percentile-normalized value. The floor is working correctly — verified by manual recomputation of 10 sample composites (all match floor-applied formula). The query tests the wrong column.
 **Recommendation:** Future plans should verify floor behavior by recomputing composites rather than checking stored dimension scores. The volatility_score column is the raw percentile, not the floored value.
+
+### 2026-06-03 — Diagnostic: phantom-mechanism — `rates_grid` misclassified as deleted-file (a2)
+**Agent:** Anvil Systems Analyst
+**Plan step:** Step 1 — phantom class assignment for `rates_grid` / `web/rates.py`.
+**What happened:** The plan classified `rates_grid` as a "deleted file (whole file removed in Phase 4 kill-dead-rate-routes)" to test mechanism (a2). Investigation revealed `web/rates.py` still exists on disk (443 lines, rebuilt in commit `769e420`). The function `rates_grid` was removed during the rebuild, but the file survives — making this an (a1) case, not (a2). Consequently, the diagnostic had no (a2) specimen and could not empirically test the deleted-file mechanism.
+**Recommendation:** Future diagnostics that need a deleted-file specimen should verify file non-existence before plan authoring (e.g., `ls invoice-pulse/web/rates.py`). To test (a2), find a file_path in `code_chunks` that does not exist on disk — a simple set-difference query against `discover_files()` output would identify true candidates.
