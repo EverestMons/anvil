@@ -281,7 +281,7 @@ The "Defer" consumers produce internal pipeline data (fingerprints, deps, classi
    Run `find_intent_gaps()` for cycle 20. Verify none of `rates_grid`, `import_contract_setup`, `record_response`, `_auto_route_after_response`, `confirm_carrier` appear in the results.
 
 7. **Legitimate findings are preserved:**
-   Compare cycle-20 `find_intent_gaps()` results against cycle-19 results (from `knowledge/research/anvil-findings-report-cycle19-2026-06-03.md` or the DB). All findings that were NOT in the known-phantom set should still appear. Count should be approximately cycle-19 count minus 5 (the phantoms). Small differences in ordering or threshold-boundary findings are acceptable.
+   Compare cycle-20 `find_intent_gaps()` results against cycle-19 results (from `knowledge/research/cycle-19-findings-2026-06-03.md` or the DB). All findings that were NOT in the known-phantom set should still appear. Count should be approximately cycle-19 count minus 5 (the phantoms). Small differences in ordering or threshold-boundary findings are acceptable.
 
 8. **Module chunks for existing files are stamped:**
    ```sql
