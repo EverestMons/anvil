@@ -61,6 +61,7 @@ def scored_project(conn):
         conn, project_id=pid, file_path="main.py", chunk_type="function",
         name="process", content="def process(a, b): pass",
         content_hash="c1_h", start_line=1, end_line=20,
+        last_seen_cycle=1,
     )
     conn.execute(
         "UPDATE code_chunks SET structural_metadata = ? WHERE id = ?",
@@ -73,6 +74,7 @@ def scored_project(conn):
         conn, project_id=pid, file_path="utils.py", chunk_type="function",
         name="helper", content="def helper(): pass",
         content_hash="c2_h", start_line=1, end_line=3,
+        last_seen_cycle=1,
     )
     simple_meta = json.dumps({
         "cyclomatic_complexity": 1,
@@ -93,6 +95,7 @@ def scored_project(conn):
         conn, project_id=pid, file_path="test_main.py", chunk_type="test_case",
         name="test_process", content="def test_process(): pass",
         content_hash="c3_h", start_line=1, end_line=2,
+        last_seen_cycle=1,
     )
 
     # Dependencies: c1 -> c2
@@ -352,3 +355,42 @@ def test_parse_pytest_output_with_errors():
     assert passed == 50
     assert failed == 3  # 2 failed + 1 error
     assert total == 53
+
+
+# --- last_seen_cycle scorer scoping ---
+
+def test_scorer_excludes_unstamped_chunks(conn, monkeypatch):
+    """Scorer only scores chunks with last_seen_cycle = cycle_id."""
+    monkeypatch.setitem(SCAN_TARGETS, "scope-test", "/tmp/scope")
+    pid = create_project(conn, "scope-test", "/tmp/scope")
+
+    # Live chunk (stamped)
+    live_id = create_chunk(
+        conn, project_id=pid, file_path="a.py", chunk_type="function",
+        name="live_fn", content="def live_fn(): pass", content_hash="lh",
+        start_line=1, end_line=1, last_seen_cycle=5,
+    )
+
+    # Phantom chunk (not stamped for this cycle)
+    phantom_id = create_chunk(
+        conn, project_id=pid, file_path="b.py", chunk_type="function",
+        name="phantom_fn", content="def phantom_fn(): pass", content_hash="ph",
+        start_line=1, end_line=1, last_seen_cycle=3,
+    )
+
+    result = score_project(conn, "scope-test", 5)
+    assert result["chunks_scored"] == 1
+
+    # Live chunk should have a health_score for cycle 5
+    cur = conn.execute(
+        "SELECT COUNT(*) FROM health_scores WHERE chunk_id = ? AND cycle_id = 5",
+        (live_id,),
+    )
+    assert cur.fetchone()[0] == 1
+
+    # Phantom chunk should NOT have a health_score for cycle 5
+    cur = conn.execute(
+        "SELECT COUNT(*) FROM health_scores WHERE chunk_id = ? AND cycle_id = 5",
+        (phantom_id,),
+    )
+    assert cur.fetchone()[0] == 0

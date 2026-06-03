@@ -471,11 +471,12 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
         "FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND cc.project_id = ? "
+        "AND cc.last_seen_cycle = ? "
         "AND hs.coverage_score >= 0.8 AND cc.chunk_type != 'test_case' "
         "AND cc.file_path NOT LIKE 'tests/%' "
         "ORDER BY hs.volatility_score DESC, hs.composite_score DESC "
         "LIMIT ?",
-        (latest_cycle_id, project_id, n_coverage),
+        (latest_cycle_id, project_id, latest_cycle_id, n_coverage),
     )
     for row in cur.fetchall():
         chunk_id, name, file_path, chunk_type, functional_role, composite_score, volatility_score, coverage_score = row
@@ -526,10 +527,11 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
         "FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND cc.project_id = ? "
+        "AND cc.last_seen_cycle = ? "
         "AND cc.file_path NOT LIKE 'tests/%' "
         "ORDER BY hs.coupling_score DESC "
         "LIMIT ?",
-        (latest_cycle_id, project_id, n_coupling),
+        (latest_cycle_id, project_id, latest_cycle_id, n_coupling),
     )
     for row in cur.fetchall():
         chunk_id, name, file_path, functional_role, composite_score, coupling_score = row
@@ -580,11 +582,12 @@ def find_intent_gaps(conn, project_name: str, project_path: str,
         "FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND cc.project_id = ? "
+        "AND cc.last_seen_cycle = ? "
         "AND cc.structural_metadata IS NOT NULL "
         "AND cc.file_path NOT LIKE 'tests/%' "
         "ORDER BY hs.complexity_score DESC "
         "LIMIT ?",
-        (latest_cycle_id, project_id, n_complexity),
+        (latest_cycle_id, project_id, latest_cycle_id, n_complexity),
     )
     for row in cur.fetchall():
         chunk_id, name, file_path, functional_role, structural_metadata, composite_score, complexity_score = row

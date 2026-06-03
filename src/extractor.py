@@ -61,6 +61,12 @@ def extract_project(conn, project_name: str, cycle_id: int) -> dict:
         if not os.path.isfile(abs_path):
             continue
 
+        # Path A: stamp module chunk as seen in this cycle
+        conn.execute(
+            "UPDATE code_chunks SET last_seen_cycle = ? WHERE id = ?",
+            (cycle_id, module_chunk["id"]),
+        )
+
         parsed_chunks = python_parser.parse_file(abs_path)
         if not parsed_chunks:
             files_processed += 1
@@ -87,10 +93,16 @@ def extract_project(conn, project_name: str, cycle_id: int) -> dict:
             if existing:
                 if existing["content_hash"] == chunk_dict["content_hash"]:
                     chunk_id = existing["id"]
+                    # Path D: unchanged chunk — stamp last_seen_cycle
+                    conn.execute(
+                        "UPDATE code_chunks SET last_seen_cycle = ? WHERE id = ?",
+                        (cycle_id, chunk_id),
+                    )
                     if chunk_dict["chunk_type"] == "class":
                         class_chunk_ids[chunk_dict["name"]] = chunk_id
                 else:
-                    _update_chunk(conn, existing["id"], chunk_dict, parent_chunk_id)
+                    _update_chunk(conn, existing["id"], chunk_dict, parent_chunk_id,
+                                  cycle_id)
                     chunk_id = existing["id"]
                     chunks_updated += 1
                     if chunk_dict["chunk_type"] == "class":
@@ -108,6 +120,7 @@ def extract_project(conn, project_name: str, cycle_id: int) -> dict:
                     end_line=chunk_dict["end_line"],
                     parent_chunk_id=parent_chunk_id,
                     cycle_id=cycle_id,
+                    last_seen_cycle=cycle_id,
                 )
                 chunks_created += 1
                 if chunk_dict["chunk_type"] == "class":
@@ -206,16 +219,17 @@ def _find_production_chunk(conn, project_id: int,
 
 
 def _update_chunk(conn, chunk_id: int, chunk_dict: dict,
-                  parent_chunk_id: Optional[int]) -> None:
+                  parent_chunk_id: Optional[int],
+                  cycle_id: Optional[int] = None) -> None:
     """Update an existing chunk with new content."""
     now = datetime.now(timezone.utc).isoformat()
     conn.execute(
         "UPDATE code_chunks SET content = ?, content_hash = ?, "
-        "start_line = ?, end_line = ?, parent_chunk_id = ?, updated_at = ? "
-        "WHERE id = ?",
+        "start_line = ?, end_line = ?, parent_chunk_id = ?, updated_at = ?, "
+        "last_seen_cycle = ? WHERE id = ?",
         (chunk_dict["content"], chunk_dict["content_hash"],
          chunk_dict["start_line"], chunk_dict["end_line"],
-         parent_chunk_id, now, chunk_id),
+         parent_chunk_id, now, cycle_id, chunk_id),
     )
     conn.commit()
 

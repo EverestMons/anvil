@@ -475,3 +475,71 @@ def test_module_level_tests_bindings_still_created(conn, mock_project):
     )
     count = cur.fetchone()[0]
     assert count >= 1, "Module-level 'tests' bindings should still be created"
+
+
+# --- last_seen_cycle stamping ---
+
+def test_extract_stamps_last_seen_cycle_on_new_chunks(conn, mock_project):
+    """Path B: newly created function chunks get last_seen_cycle = cycle_id."""
+    pid, _ = mock_project
+    extract_project(conn, "mock-project", 7)
+
+    cur = conn.execute(
+        "SELECT last_seen_cycle FROM code_chunks "
+        "WHERE project_id = ? AND chunk_type = 'function'", (pid,),
+    )
+    for row in cur.fetchall():
+        assert row[0] == 7, "New function chunks must have last_seen_cycle=cycle_id"
+
+
+def test_extract_stamps_last_seen_cycle_on_module_chunks(conn, mock_project):
+    """Path A: module chunks for existing files get last_seen_cycle stamped."""
+    pid, _ = mock_project
+    extract_project(conn, "mock-project", 7)
+
+    cur = conn.execute(
+        "SELECT last_seen_cycle FROM code_chunks "
+        "WHERE project_id = ? AND chunk_type = 'module'", (pid,),
+    )
+    for row in cur.fetchall():
+        assert row[0] == 7, "Module chunks must have last_seen_cycle=cycle_id"
+
+
+def test_extract_stamps_unchanged_chunks(conn, mock_project):
+    """Path D (the trap): unchanged chunks still get last_seen_cycle updated."""
+    pid, _ = mock_project
+
+    # First extraction — creates all chunks with cycle 1
+    extract_project(conn, "mock-project", 1)
+
+    # Second extraction — content unchanged, cycle 2
+    extract_project(conn, "mock-project", 2)
+
+    cur = conn.execute(
+        "SELECT last_seen_cycle FROM code_chunks "
+        "WHERE project_id = ? AND chunk_type IN ('function', 'method', 'class', 'test_case')",
+        (pid,),
+    )
+    for row in cur.fetchall():
+        assert row[0] == 2, "Unchanged chunks must be re-stamped with the new cycle_id"
+
+
+def test_extract_does_not_stamp_missing_file_chunks(conn, mock_project, tmp_path):
+    """Path E: chunks for deleted files are NOT stamped."""
+    pid, _ = mock_project
+    extract_project(conn, "mock-project", 1)
+
+    # Delete utils.py from disk
+    os.remove(str(tmp_path / "utils.py"))
+
+    # Re-extract with cycle 2
+    extract_project(conn, "mock-project", 2)
+
+    # Chunks from utils.py should still have last_seen_cycle=1 (not 2)
+    cur = conn.execute(
+        "SELECT name, last_seen_cycle FROM code_chunks "
+        "WHERE project_id = ? AND file_path = 'utils.py' AND chunk_type <> 'module'",
+        (pid,),
+    )
+    for name, lsc in cur.fetchall():
+        assert lsc == 1, f"Chunk '{name}' from deleted file should retain last_seen_cycle=1"

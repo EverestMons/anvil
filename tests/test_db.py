@@ -423,3 +423,46 @@ def test_cycle_report_unique_per_project(conn, project_id):
 
 def test_get_cycle_report_not_found(conn):
     assert get_cycle_report(conn, 999) is None
+
+
+# --- last_seen_cycle migration and usage ---
+
+def test_last_seen_cycle_column_exists(conn):
+    """Migration adds last_seen_cycle column to code_chunks."""
+    cur = conn.execute("PRAGMA table_info(code_chunks)")
+    columns = {row[1] for row in cur.fetchall()}
+    assert "last_seen_cycle" in columns
+
+
+def test_last_seen_cycle_migration_idempotent(conn):
+    """Calling init_db twice does not error on last_seen_cycle column."""
+    init_db(conn)  # second call
+    cur = conn.execute("PRAGMA table_info(code_chunks)")
+    columns = [row[1] for row in cur.fetchall()]
+    assert columns.count("last_seen_cycle") == 1
+
+
+def test_create_chunk_with_last_seen_cycle(conn, project_id):
+    """create_chunk accepts last_seen_cycle kwarg."""
+    cid = create_chunk(
+        conn, project_id=project_id, file_path="a.py", chunk_type="function",
+        name="foo", content="def foo(): pass", content_hash="h1",
+        start_line=1, end_line=1, last_seen_cycle=5,
+    )
+    cur = conn.execute(
+        "SELECT last_seen_cycle FROM code_chunks WHERE id = ?", (cid,),
+    )
+    assert cur.fetchone()[0] == 5
+
+
+def test_create_chunk_without_last_seen_cycle_defaults_null(conn, project_id):
+    """Chunks created without last_seen_cycle have NULL."""
+    cid = create_chunk(
+        conn, project_id=project_id, file_path="a.py", chunk_type="function",
+        name="bar", content="def bar(): pass", content_hash="h2",
+        start_line=1, end_line=1,
+    )
+    cur = conn.execute(
+        "SELECT last_seen_cycle FROM code_chunks WHERE id = ?", (cid,),
+    )
+    assert cur.fetchone()[0] is None

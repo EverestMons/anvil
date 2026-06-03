@@ -36,11 +36,12 @@ def score_project(conn, project_name: str, cycle_id: int) -> dict:
 
     project_id = project["id"]
 
-    # Load all non-module chunks
+    # Load current-snapshot non-module chunks (last_seen_cycle = this cycle)
     conn.row_factory = db._row_to_dict
     cur = conn.execute(
-        "SELECT * FROM code_chunks WHERE project_id = ? AND chunk_type != 'module'",
-        (project_id,),
+        "SELECT * FROM code_chunks WHERE project_id = ? AND chunk_type != 'module' "
+        "AND last_seen_cycle = ?",
+        (project_id, cycle_id),
     )
     chunks = cur.fetchall()
     conn.row_factory = None

@@ -45,7 +45,8 @@ def init_db(conn: sqlite3.Connection) -> None:
             parent_chunk_id INTEGER REFERENCES code_chunks(id) ON DELETE SET NULL,
             created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
             updated_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-            cycle_id        INTEGER
+            cycle_id        INTEGER,
+            last_seen_cycle INTEGER
         );
 
         CREATE INDEX IF NOT EXISTS idx_code_chunks_project_file
@@ -252,6 +253,13 @@ def init_db(conn: sqlite3.Connection) -> None:
     # Migration: add functional_role column if not present
     try:
         conn.execute("ALTER TABLE code_chunks ADD COLUMN functional_role TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Migration: add last_seen_cycle column if not present
+    try:
+        conn.execute("ALTER TABLE code_chunks ADD COLUMN last_seen_cycle INTEGER")
         conn.commit()
     except sqlite3.OperationalError:
         pass  # Column already exists

@@ -328,6 +328,7 @@ def test_find_intent_gaps_returns_required_keys(conn, tmp_path):
         conn, project_id=pid, file_path="src/foo.py", chunk_type="function",
         name="do_thing", content="def do_thing(): pass",
         content_hash="abc123", start_line=1, end_line=3,
+        last_seen_cycle=1,
     )
     create_health_score(
         conn, chunk_id, cycle_id=1,
@@ -346,6 +347,50 @@ def test_find_intent_gaps_returns_required_keys(conn, tmp_path):
         assert isinstance(finding["chunk_ids"], list)
         assert finding["finding_type"] == "intent_gap"
         assert finding["severity"] in ("CRITICAL", "HIGH", "MEDIUM", "LOW")
+
+
+def test_find_intent_gaps_excludes_stale_chunks(conn, tmp_path):
+    """Belt-and-suspenders: chunks with wrong last_seen_cycle are excluded."""
+    (tmp_path / "PROJECT_BRIEF.md").write_text("Test project brief.")
+    glossary_dir = tmp_path / "knowledge" / "research"
+    glossary_dir.mkdir(parents=True)
+    (glossary_dir / "domain-glossary.md").write_text("# Glossary\n")
+
+    pid = create_project(conn, "stale-test", str(tmp_path))
+
+    # Live chunk — stamped for cycle 2
+    live_id = create_chunk(
+        conn, project_id=pid, file_path="src/live.py", chunk_type="function",
+        name="live_fn", content="def live_fn(): pass",
+        content_hash="live_h", start_line=1, end_line=3,
+        last_seen_cycle=2,
+    )
+    create_health_score(
+        conn, live_id, cycle_id=2,
+        composite_score=0.80, coverage_score=0.90,
+        volatility_score=0.85, coupling_score=0.50,
+        complexity_score=0.40, staleness_score=0.30,
+    )
+
+    # Phantom chunk — last_seen_cycle=1, but has cycle-2 health_scores
+    phantom_id = create_chunk(
+        conn, project_id=pid, file_path="src/phantom.py", chunk_type="function",
+        name="phantom_fn", content="def phantom_fn(): pass",
+        content_hash="phantom_h", start_line=1, end_line=3,
+        last_seen_cycle=1,
+    )
+    create_health_score(
+        conn, phantom_id, cycle_id=2,
+        composite_score=0.90, coverage_score=0.95,
+        volatility_score=0.95, coupling_score=0.60,
+        complexity_score=0.50, staleness_score=0.40,
+    )
+
+    result = find_intent_gaps(conn, "stale-test", str(tmp_path), top_n=10)
+
+    names = [f["chunk_name"] for f in result]
+    assert "live_fn" in names, "Live chunk should appear in findings"
+    assert "phantom_fn" not in names, "Phantom chunk must be excluded by freshness guard"
 
 
 # --- _extract_project_mission ---
