@@ -30,23 +30,15 @@ day, YYYY-MM-DD) · `<UTC>` UTC date at expected execution, YYYY-MM-DD.
    dispatch promptly and, if it misses, re-stamp the deposit declaration and
    re-dispatch (manual recovery — no source-side fix exists).
 
-3. **Declare the canonical cycle report as a deposit, and commit it before the
-   close verdict.** `run_cycle` writes
-   `knowledge/research/cycle-<N>-findings-<UTC>.md` to the canonical anvil MAIN
-   path (ANVIL_ROOT is hardcoded — F8), NOT the worktree. It is a git-tracked
-   artifact (cycles 1–20 are all in `git ls-files`), so do NOT gitignore it.
-   Because the run executes in a worktree but the file lands in main, it sits
-   untracked in main and trips worktree-teardown's dirty-tree pre-check. Two
-   required actions:
-   (a) declare it in the DEV step's `**Deposits:**` block (below), and
-   (b) at session wrap, AFTER Step 2 (QA) completes and BEFORE depositing the
-   terminal close verdict (verdict consumption triggers teardown), commit it on
-   main:
-   `git add knowledge/research/cycle-<N>-findings-<UTC>.md && git commit -m "chore: cycle <N> canonical report"`
-   Residual: if teardown later hits parallel-SHA divergence and you recover via
-   `git fetch origin && git reset --hard origin/main`, that reset discards the
-   local commit AND deletes the tracked file from the working tree — re-stage and
-   re-commit (or push) the report after recovery.
+3. **The cycle report lands in the worktree, not canonical main.** `run_cycle`
+   writes `knowledge/research/cycle-<N>-findings-<UTC>.md` to the runtime root
+   (`ANVIL_RUNTIME_ROOT`), which resolves to the worktree during a Bellows
+   dispatch. It is a git-tracked artifact (cycles 1–20 are all in
+   `git ls-files`), so do NOT gitignore it. The report MUST be explicitly staged
+   before the worktree commit — the DEV step contains an explicit `git add`
+   instruction for this (see STEP 1 below). No Planner wrap-commit on main is
+   needed; the report rides the worktree commit and lands on main at teardown.
+   Declare it in the DEV step's `**Deposits:**` block.
 
 4. **Verify <N>, <UTC>, and the produced filename from source of truth.** Cycle
    number is project-scoped: `cycle_id = MAX(cycle_number where project_id) + 1`
@@ -122,7 +114,7 @@ Planner's Rule 22 close verdict and Bellows-side move to Done.
 
 > **Identity:** You are the Anvil Developer. **Reads (in order):** `agents/ANVIL_DEVELOPER.md`, `knowledge/research/domain-glossary.md`, `PROJECT_STATUS.md` (last cycle was <N-1>; this is cycle <N>), and the most recent completed cycle executable in `knowledge/decisions/Done/` as a worked example of cycle execution mechanics.
 >
-> **Working directory note:** Bellows runs this plan in a worktree at `anvil/.bellows-worktrees/anvil-cycle-<N>-<LOCAL>/`; the worktree IS the anvil root from your perspective. For Anvil source imports use relative paths (e.g., `from src.cycle import run_cycle`). **For DB access use the absolute canonical path** `/Users/marklehn/Developer/GitHub/anvil/anvil.db`. The F8 hardcode (`ANVIL_ROOT`, commit `86ba5fd`) means run_cycle deposits resolve to canonical main-repo locations automatically — including the cycle report, which lands in MAIN, not the worktree.
+> **Working directory note:** Bellows runs this plan in a worktree at `anvil/.bellows-worktrees/anvil-cycle-<N>-<LOCAL>/`; the worktree IS the anvil root from your perspective. For Anvil source imports use relative paths (e.g., `from src.cycle import run_cycle`). **For DB access use the absolute canonical path** `/Users/marklehn/Developer/GitHub/anvil/anvil.db`. The cycle report lands in the WORKTREE at `knowledge/research/cycle-<N>-findings-<UTC>.md` (via `ANVIL_RUNTIME_ROOT`). The DB record stores the canonical path (`ANVIL_ROOT`), which becomes valid after teardown lands the worktree commits to main.
 >
 > **Task:** Run Anvil Cycle <N> against invoice-pulse.
 >
@@ -163,7 +155,7 @@ Planner's Rule 22 close verdict and Bellows-side move to Done.
 >
 > (2) Locate the audit findings file. Per F8 + UTC stamping it is at `/Users/marklehn/Developer/GitHub/invoice-pulse/knowledge/anvil/audit-findings-<UTC>.md` (canonical path, UTC date, NOT worktree-local). Confirm it exists there. If worktree-local, FLAG for CEO — F8 is not working.
 >
-> (3) Locate the canonical cycle report at `/Users/marklehn/Developer/GitHub/anvil/knowledge/research/cycle-<N>-findings-<UTC>.md` (canonical MAIN path, UTC date). Confirm it exists there and print its exact filename verbatim — the date is UTC; the Planner needs it for the wrap commit.
+> (3) Locate the cycle report at `knowledge/research/cycle-<N>-findings-<UTC>.md` (worktree-relative path, UTC date). Confirm it exists and print its exact filename verbatim. The file lands in the worktree via `ANVIL_RUNTIME_ROOT`; step (10) stages it for commit.
 >
 > (4) From the findings file: print all CRITICAL findings verbatim; count findings by severity.
 >
@@ -176,6 +168,14 @@ Planner's Rule 22 close verdict and Bellows-side move to Done.
 > (8) Top-10 highest-composite findings as a table (function, file, composite, finding type).
 >
 > (9) **Phantom-function check (known-bug mitigation).** For each function in the top-10, verify it still exists in current invoice-pulse source: `grep -rn "def <function_name>" /Users/marklehn/Developer/GitHub/invoice-pulse/<file_path>`. Record EXISTS or DELETED per function. Any DELETED is a phantom (BACKLOG 2026-05-18) — list explicitly so the Planner excludes it at triage. Watch `web/action_queue.py` entries.
+>
+> **(10) Stage the cycle report for commit.** The report lands in the worktree and
+> MUST be committed with the worktree's changes:
+> ```bash
+> git add knowledge/research/cycle-<N>-findings-<UTC>.md
+> ```
+> Verify staged: `git status` should show it as "new file" under "Changes to be
+> committed." If it appears under "Untracked files," the add failed — retry.
 >
 > **Constraints:** Do NOT modify Anvil source. Do NOT modify invoice-pulse source. If findings count is suspiciously low (<5) or high (>250), flag without speculating.
 >
@@ -205,7 +205,7 @@ Planner's Rule 22 close verdict and Bellows-side move to Done.
 >
 > **(2) Audit findings file at canonical path.** `ls -la /Users/marklehn/Developer/GitHub/invoice-pulse/knowledge/anvil/audit-findings-<UTC>.md > knowledge/qa/evidence/executable-anvil-cycle-<N>-<LOCAL>/findings_file_path.txt 2>&1`. Expected: exists. ❌ if missing or worktree-local.
 >
-> **(3) Canonical cycle report at main path.** `ls -la /Users/marklehn/Developer/GitHub/anvil/knowledge/research/cycle-<N>-findings-<UTC>.md > knowledge/qa/evidence/executable-anvil-cycle-<N>-<LOCAL>/cycle_report_path.txt 2>&1`. Expected: exists at canonical main path with UTC date. ❌ if missing or worktree-local.
+> **(3) Cycle report in worktree.** `ls -la knowledge/research/cycle-<N>-findings-<UTC>.md > knowledge/qa/evidence/executable-anvil-cycle-<N>-<LOCAL>/cycle_report_path.txt 2>&1`. Expected: exists at worktree-relative path with UTC date. ❌ if missing. Also verify it is staged: `git diff --cached --name-only | grep cycle-<N>-findings > knowledge/qa/evidence/executable-anvil-cycle-<N>-<LOCAL>/cycle_report_staged.txt 2>&1`. Expected: ≥1 match.
 >
 > **(4) Untested Complexity section present.** `grep -n "Untested Complexity" /Users/marklehn/Developer/GitHub/invoice-pulse/knowledge/anvil/audit-findings-<UTC>.md > knowledge/qa/evidence/executable-anvil-cycle-<N>-<LOCAL>/untested_complexity_grep.txt 2>&1`. Expected: exactly one match.
 >

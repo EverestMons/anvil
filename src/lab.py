@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from src import db
 from src.config import (
     ANVIL_ROOT,
+    ANVIL_RUNTIME_ROOT,
     HIGH_RISK_THRESHOLD,
     COVERAGE_GAP_THRESHOLD,
     COUPLING_HOTSPOT_THRESHOLD,
@@ -90,14 +91,17 @@ def run_lab(conn, project_name: str, cycle_id: int) -> dict:
     specialist_data = generate_specialist_update_data(conn, project_id, cycle_id)
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    report_filename = f"cycle-{cycle_id}-findings-{today}.md"
+    write_path = os.path.join(
+        ANVIL_RUNTIME_ROOT, "knowledge", "research", report_filename,
+    )
     report_path = os.path.join(
-        ANVIL_ROOT, "knowledge", "research",
-        f"cycle-{cycle_id}-findings-{today}.md",
+        ANVIL_ROOT, "knowledge", "research", report_filename,
     )
 
     write_cycle_report(
         conn, project_name, cycle_id, findings, constraints,
-        specialist_data, report_path, started_at,
+        specialist_data, write_path, report_path, started_at,
     )
 
     total = sum(len(v) for v in findings.values())
@@ -850,9 +854,9 @@ def generate_specialist_update_data(conn, project_id: int, cycle_id: int) -> dic
 
 def write_cycle_report(conn, project_name: str, cycle_id: int,
                        findings: dict, constraints: list[dict],
-                       specialist_data: dict, report_path: str,
-                       started_at: str) -> None:
-    """Generate markdown report and create cycle_reports DB row."""
+                       specialist_data: dict, write_path: str,
+                       report_path: str, started_at: str) -> None:
+    """Generate markdown report at write_path; record report_path (canonical) in DB."""
     project = db.get_project(conn, project_name)
     project_id = project["id"]
     completed_at = datetime.now(timezone.utc).isoformat()
@@ -1054,8 +1058,8 @@ def write_cycle_report(conn, project_name: str, cycle_id: int,
     lines.append("")
 
     content = "\n".join(lines)
-    os.makedirs(os.path.dirname(report_path), exist_ok=True)
-    with open(report_path, "w") as f:
+    os.makedirs(os.path.dirname(write_path), exist_ok=True)
+    with open(write_path, "w") as f:
         f.write(content)
 
     # DB row

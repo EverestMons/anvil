@@ -5,6 +5,8 @@ import os
 
 ANVIL_ROOT = "/Users/marklehn/Developer/GitHub/anvil"
 
+ANVIL_RUNTIME_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 ANVIL_DB_PATH = os.path.join(ANVIL_ROOT, "anvil.db")
 
 SCAN_TARGETS = {

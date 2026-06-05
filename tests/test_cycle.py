@@ -87,6 +87,7 @@ def cycle_project(tmp_path, conn, monkeypatch):
 def test_run_cycle_end_to_end(conn, cycle_project, monkeypatch):
     # Patch ANVIL_ROOT so report writes to tmp
     monkeypatch.setattr("src.lab.ANVIL_ROOT", str(cycle_project))
+    monkeypatch.setattr("src.lab.ANVIL_RUNTIME_ROOT", str(cycle_project))
     os.makedirs(str(cycle_project / "knowledge" / "research"), exist_ok=True)
 
     result = run_cycle(conn, "cycle-test")

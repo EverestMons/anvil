@@ -246,16 +246,17 @@ def test_write_cycle_report(conn, lab_project, tmp_path):
     }
     constraints = generate_planner_constraints(conn, "lab-test", 1, findings)
     specialist_data = generate_specialist_update_data(conn, pid, 1)
-    report_path = str(tmp_path / "cycle-1-report.md")
+    write_path = str(tmp_path / "cycle-1-report.md")
+    report_path = str(tmp_path / "canonical" / "cycle-1-report.md")
 
     write_cycle_report(
         conn, "lab-test", 1, findings, constraints,
-        specialist_data, report_path, "2026-03-30T10:00:00",
+        specialist_data, write_path, report_path, "2026-03-30T10:00:00",
     )
 
     # Verify markdown file exists with sections
-    assert os.path.isfile(report_path)
-    with open(report_path, "r") as f:
+    assert os.path.isfile(write_path)
+    with open(write_path, "r") as f:
         content = f.read()
     assert "Executive Summary" in content
     assert "Coverage Gaps" in content
@@ -267,10 +268,43 @@ def test_write_cycle_report(conn, lab_project, tmp_path):
     assert "Planner Constraints" in content
     assert "Specialist Update Data" in content
 
-    # Verify DB row
-    cur = conn.execute("SELECT * FROM cycle_reports WHERE cycle_number = 1")
+    # Verify DB row records canonical report_path
+    cur = conn.execute("SELECT report_path FROM cycle_reports WHERE cycle_number = 1")
     row = cur.fetchone()
     assert row is not None
+    assert row[0] == report_path
+
+
+def test_write_vs_record_path_split(conn, lab_project, tmp_path):
+    """File writes to write_path; DB records report_path (canonical)."""
+    pid, _, _, _, _ = lab_project
+    findings = {k: [] for k in [
+        "coverage_gaps", "coupling_hotspots", "clone_candidates",
+        "staleness_alerts", "complexity_hotspots", "cochange_patterns",
+    ]}
+    specialist_data = generate_specialist_update_data(conn, pid, 1)
+
+    runtime_dir = tmp_path / "runtime" / "knowledge" / "research"
+    canonical_dir = tmp_path / "canonical" / "knowledge" / "research"
+    # Do NOT create canonical_dir — the file should NOT land there
+
+    write_path = str(runtime_dir / "cycle-1-findings-2026-06-05.md")
+    report_path = str(canonical_dir / "cycle-1-findings-2026-06-05.md")
+
+    write_cycle_report(
+        conn, "lab-test", 1, findings, [],
+        specialist_data, write_path, report_path, "2026-06-05T10:00:00",
+    )
+
+    # File written to write_path (runtime)
+    assert os.path.isfile(write_path)
+    # File NOT written to report_path (canonical)
+    assert not os.path.isfile(report_path)
+    # DB records canonical path
+    row = conn.execute(
+        "SELECT report_path FROM cycle_reports WHERE cycle_number = 1"
+    ).fetchone()
+    assert row[0] == report_path
 
 
 # --- run_lab end-to-end ---
@@ -278,6 +312,7 @@ def test_write_cycle_report(conn, lab_project, tmp_path):
 def test_run_lab_end_to_end(conn, lab_project, tmp_path, monkeypatch):
     monkeypatch.setitem(SCAN_TARGETS, "lab-test", "/tmp/lab-test")
     monkeypatch.setattr("src.lab.ANVIL_ROOT", str(tmp_path))
+    monkeypatch.setattr("src.lab.ANVIL_RUNTIME_ROOT", str(tmp_path))
 
     # Create knowledge/research dir
     os.makedirs(str(tmp_path / "knowledge" / "research"), exist_ok=True)
@@ -501,14 +536,15 @@ def test_cycle_report_includes_untested_complexity(conn, tmp_path):
         "intent_gaps": [],
     }
     specialist_data = generate_specialist_update_data(conn, pid, 1)
-    report_path = str(tmp_path / "uc-report.md")
+    write_path = str(tmp_path / "uc-report.md")
+    report_path = str(tmp_path / "canonical" / "uc-report.md")
 
     write_cycle_report(
         conn, "uc-test", 1, findings, [], specialist_data,
-        report_path, "2026-05-18T10:00:00",
+        write_path, report_path, "2026-05-18T10:00:00",
     )
 
-    with open(report_path, "r") as f:
+    with open(write_path, "r") as f:
         content = f.read()
 
     assert "## Untested Complexity" in content
