@@ -183,7 +183,7 @@ def test_find_deviations(conn):
         conn, project_id=pid, file_path="web/contracts.py",
         chunk_type="function", name="handle_form",
         content="@contracts_bp.route('/form')\ndef handle_form():\n    try:\n        x()\n    except:\n        pass",
-        content_hash="h1", start_line=1, end_line=5,
+        content_hash="h1", start_line=1, end_line=5, last_seen_cycle=1,
     )
     conn.execute(
         "UPDATE code_chunks SET functional_role = 'route_handler' WHERE id = ?",
@@ -191,7 +191,7 @@ def test_find_deviations(conn):
     )
     conn.commit()
 
-    deviations = find_best_practice_deviations(conn, pid)
+    deviations = find_best_practice_deviations(conn, pid, 1)
     assert len(deviations) >= 1
 
     # Should find consistent_error_handling violation
@@ -215,7 +215,7 @@ def test_no_deviations_for_compliant_chunk(conn):
         conn, project_id=pid, file_path="web/index.py",
         chunk_type="function", name="index",
         content="@app.route('/')\ndef index():\n    return 'ok'",
-        content_hash="h2", start_line=1, end_line=3,
+        content_hash="h2", start_line=1, end_line=3, last_seen_cycle=1,
     )
     conn.execute(
         "UPDATE code_chunks SET functional_role = 'route_handler' WHERE id = ?",
@@ -223,7 +223,7 @@ def test_no_deviations_for_compliant_chunk(conn):
     )
     conn.commit()
 
-    deviations = find_best_practice_deviations(conn, pid)
+    deviations = find_best_practice_deviations(conn, pid, 1)
     # May still have some deviations from structural checks, but not error_handling
     error_devs = [d for d in deviations if d["practice_name"] == "consistent_error_handling"]
     assert len(error_devs) == 0
@@ -237,8 +237,8 @@ def test_unclassified_chunks_skipped(conn):
         conn, project_id=pid, file_path="random.py",
         chunk_type="function", name="random_func",
         content="def random_func():\n    try:\n        x()\n    except:\n        pass",
-        content_hash="h3", start_line=1, end_line=4,
+        content_hash="h3", start_line=1, end_line=4, last_seen_cycle=1,
     )
 
-    deviations = find_best_practice_deviations(conn, pid)
+    deviations = find_best_practice_deviations(conn, pid, 1)
     assert len(deviations) == 0

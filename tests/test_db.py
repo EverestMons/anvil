@@ -23,6 +23,7 @@ from src.db import (
     create_health_score,
     create_cycle_report,
     get_cycle_report,
+    create_provenance,
 )
 
 
@@ -466,3 +467,62 @@ def test_create_chunk_without_last_seen_cycle_defaults_null(conn, project_id):
         "SELECT last_seen_cycle FROM code_chunks WHERE id = ?", (cid,),
     )
     assert cur.fetchone()[0] is None
+
+
+# --- Cascade on DELETE ---
+
+def test_cascade_delete_removes_all_dependent_rows(conn, project_id):
+    """Deleting a code_chunk cascades to all dependent tables and SET NULLs references."""
+    # Create two chunks so we can test cross-references
+    c1 = create_chunk(
+        conn, project_id=project_id, file_path="x.py", chunk_type="function",
+        name="target", content="def target(): pass", content_hash="t1",
+        start_line=1, end_line=2,
+    )
+    c2 = create_chunk(
+        conn, project_id=project_id, file_path="y.py", chunk_type="function",
+        name="caller", content="def caller(): pass", content_hash="t2",
+        start_line=1, end_line=2,
+    )
+
+    # Create dependent rows pointing to c1
+    create_fingerprint(conn, c1, "fp_hash", None, None, 1)
+    create_symbol_binding(conn, c1, "target", "defines")
+    create_symbol_binding(conn, c2, "target", "calls", target_chunk_id=c1)
+    create_dependency(conn, c2, c1, "call", "cross_file")
+    create_similarity(conn, c1, c2, 0.80, cycle_id=1)
+    create_health_score(conn, c1, cycle_id=1, composite_score=0.5)
+    create_provenance(conn, c1, "test-plan", dev_log_path="log.md")
+
+    # Verify rows exist before delete
+    assert conn.execute("SELECT COUNT(*) FROM chunk_fingerprints WHERE chunk_id = ?", (c1,)).fetchone()[0] > 0
+    assert conn.execute("SELECT COUNT(*) FROM chunk_symbol_bindings WHERE chunk_id = ?", (c1,)).fetchone()[0] > 0
+    assert conn.execute("SELECT COUNT(*) FROM chunk_dependencies WHERE target_chunk_id = ?", (c1,)).fetchone()[0] > 0
+    assert conn.execute("SELECT COUNT(*) FROM chunk_similarities WHERE chunk_a_id = ?", (c1,)).fetchone()[0] > 0
+    assert conn.execute("SELECT COUNT(*) FROM health_scores WHERE chunk_id = ?", (c1,)).fetchone()[0] > 0
+    assert conn.execute("SELECT COUNT(*) FROM chunk_provenance WHERE chunk_id = ?", (c1,)).fetchone()[0] > 0
+
+    # DELETE chunk c1
+    conn.execute("DELETE FROM code_chunks WHERE id = ?", (c1,))
+    conn.commit()
+
+    # Cascade: all dependent rows gone
+    assert conn.execute("SELECT COUNT(*) FROM chunk_fingerprints WHERE chunk_id = ?", (c1,)).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM chunk_symbol_bindings WHERE chunk_id = ?", (c1,)).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM chunk_dependencies WHERE target_chunk_id = ?", (c1,)).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM chunk_similarities WHERE chunk_a_id = ?", (c1,)).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM health_scores WHERE chunk_id = ?", (c1,)).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM chunk_provenance WHERE chunk_id = ?", (c1,)).fetchone()[0] == 0
+
+    # SET NULL: c2's binding that targeted c1 should now be NULL
+    cur = conn.execute(
+        "SELECT target_chunk_id FROM chunk_symbol_bindings WHERE chunk_id = ? AND symbol_name = 'target'",
+        (c2,),
+    )
+    row = cur.fetchone()
+    assert row is not None
+    assert row[0] is None, "target_chunk_id should be SET NULL after cascade"
+
+    # No FK violations
+    violations = conn.execute("PRAGMA foreign_key_check").fetchall()
+    assert violations == []

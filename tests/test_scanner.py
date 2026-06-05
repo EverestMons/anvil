@@ -17,6 +17,7 @@ from src.scanner import (
     detect_changes,
     ingest_git_history,
     register_file_chunks,
+    prune_deleted_file_orphans,
 )
 from src.config import EXCLUDED_DIRS, EXCLUDED_EXTENSIONS
 
@@ -342,3 +343,113 @@ def test_scan_project_updates_last_scanned(conn, temp_project, monkeypatch):
     scan_project(conn, "test-proj")
     cur = conn.execute("SELECT last_scanned FROM projects WHERE name = 'test-proj'")
     assert cur.fetchone()[0] is not None
+
+
+# --- prune_deleted_file_orphans ---
+
+def test_prune_removes_orphan_chunks(conn, temp_project):
+    """Orphan file_path chunks are deleted; live chunks are untouched."""
+    pid = create_project(conn, "prune-test", str(temp_project))
+
+    # Live module — file exists on disk
+    live = create_chunk(
+        conn, project_id=pid, file_path="src/main.py", chunk_type="module",
+        name="src/main.py", content="# live", content_hash="lh",
+        start_line=1, end_line=1,
+    )
+
+    # Orphan module — file does NOT exist on disk
+    orphan_mod = create_chunk(
+        conn, project_id=pid, file_path="deleted/gone.py", chunk_type="module",
+        name="deleted/gone.py", content="# orphan", content_hash="oh",
+        start_line=1, end_line=1,
+    )
+
+    # Orphan child function in the same deleted file
+    orphan_child = create_chunk(
+        conn, project_id=pid, file_path="deleted/gone.py", chunk_type="function",
+        name="old_func", content="def old_func(): pass", content_hash="och",
+        start_line=1, end_line=2,
+    )
+
+    on_disk = {f["relative_path"] for f in
+               discover_files(str(temp_project), EXCLUDED_DIRS, EXCLUDED_EXTENSIONS)}
+
+    result = prune_deleted_file_orphans(conn, pid, on_disk)
+
+    assert result["pruned_files"] == 1
+    assert result["pruned_chunks"] == 2
+    assert result["pruned_modules"] == 1
+    assert result["pruned_children"] == 1
+
+    # Live chunk still exists
+    cur = conn.execute("SELECT id FROM code_chunks WHERE id = ?", (live,))
+    assert cur.fetchone() is not None
+
+    # Orphan chunks are gone
+    cur = conn.execute("SELECT id FROM code_chunks WHERE id IN (?, ?)",
+                       (orphan_mod, orphan_child))
+    assert cur.fetchall() == []
+
+
+def test_prune_creates_backup(conn, temp_project, tmp_path, monkeypatch):
+    """Backup file is created before prune when orphans exist."""
+    pid = create_project(conn, "backup-test", str(temp_project))
+
+    # Create a fake anvil.db so shutil.copy2 works
+    fake_db = tmp_path / "anvil.db"
+    fake_db.write_text("fake db")
+    monkeypatch.setattr("src.scanner.ANVIL_DB_PATH", str(fake_db))
+    monkeypatch.setattr("src.scanner.ANVIL_ROOT", str(tmp_path))
+
+    create_chunk(
+        conn, project_id=pid, file_path="deleted/gone.py", chunk_type="module",
+        name="deleted/gone.py", content="# orphan", content_hash="oh",
+        start_line=1, end_line=1,
+    )
+
+    on_disk = {f["relative_path"] for f in
+               discover_files(str(temp_project), EXCLUDED_DIRS, EXCLUDED_EXTENSIONS)}
+
+    prune_deleted_file_orphans(conn, pid, on_disk)
+
+    backup_dir = tmp_path / "backups"
+    backups = list(backup_dir.glob("anvil-backup-*.db"))
+    assert len(backups) == 1
+
+
+def test_prune_idempotent(conn, temp_project):
+    """Second prune call with no orphans is a clean no-op."""
+    pid = create_project(conn, "idem-test", str(temp_project))
+
+    create_chunk(
+        conn, project_id=pid, file_path="deleted/gone.py", chunk_type="module",
+        name="deleted/gone.py", content="# orphan", content_hash="oh",
+        start_line=1, end_line=1,
+    )
+
+    on_disk = {f["relative_path"] for f in
+               discover_files(str(temp_project), EXCLUDED_DIRS, EXCLUDED_EXTENSIONS)}
+
+    r1 = prune_deleted_file_orphans(conn, pid, on_disk)
+    assert r1["pruned_chunks"] == 1
+
+    r2 = prune_deleted_file_orphans(conn, pid, on_disk)
+    assert r2["pruned_files"] == 0
+    assert r2["pruned_chunks"] == 0
+
+
+def test_prune_no_orphans_no_backup(conn, temp_project, tmp_path, monkeypatch):
+    """No backup is created when there are no orphans."""
+    pid = create_project(conn, "noop-test", str(temp_project))
+
+    monkeypatch.setattr("src.scanner.ANVIL_ROOT", str(tmp_path))
+
+    on_disk = {f["relative_path"] for f in
+               discover_files(str(temp_project), EXCLUDED_DIRS, EXCLUDED_EXTENSIONS)}
+
+    result = prune_deleted_file_orphans(conn, pid, on_disk)
+    assert result["pruned_files"] == 0
+
+    backup_dir = tmp_path / "backups"
+    assert not backup_dir.exists() or list(backup_dir.glob("*.db")) == []

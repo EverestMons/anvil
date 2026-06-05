@@ -20,6 +20,7 @@ from src.lab import (
     find_cochange_patterns,
     find_staleness_alerts,
     find_complexity_hotspots,
+    find_best_practice_deviations,
     find_intent_gaps,
     write_intent_audit,
     generate_planner_constraints,
@@ -49,14 +50,14 @@ def lab_project(conn):
     mod = create_chunk(
         conn, project_id=pid, file_path="main.py", chunk_type="module",
         name="main.py", content="# mod", content_hash="mod_h",
-        start_line=1, end_line=1,
+        start_line=1, end_line=1, last_seen_cycle=1,
     )
 
     # High-risk untested function
     c1 = create_chunk(
         conn, project_id=pid, file_path="main.py", chunk_type="function",
         name="risky_func", content="def risky_func(): pass",
-        content_hash="c1_h", start_line=1, end_line=10,
+        content_hash="c1_h", start_line=1, end_line=10, last_seen_cycle=1,
     )
     meta1 = json.dumps({"cyclomatic_complexity": 20, "nesting_depth": 5, "parameter_count": 4,
                          "import_count": 0, "has_docstring": False, "line_count": 10})
@@ -71,7 +72,7 @@ def lab_project(conn):
     c2 = create_chunk(
         conn, project_id=pid, file_path="utils.py", chunk_type="function",
         name="safe_func", content="def safe_func(): pass",
-        content_hash="c2_h", start_line=1, end_line=3,
+        content_hash="c2_h", start_line=1, end_line=3, last_seen_cycle=1,
     )
     create_health_score(conn, c2, cycle_id=1, volatility_score=0.1,
                         coverage_score=0.2, complexity_score=0.1,
@@ -82,7 +83,7 @@ def lab_project(conn):
     c3 = create_chunk(
         conn, project_id=pid, file_path="test_utils.py", chunk_type="test_case",
         name="test_safe", content="def test_safe(): pass",
-        content_hash="c3_h", start_line=1, end_line=2,
+        content_hash="c3_h", start_line=1, end_line=2, last_seen_cycle=1,
     )
     create_health_score(conn, c3, cycle_id=1, volatility_score=0.0,
                         coverage_score=0.0, complexity_score=0.1,
@@ -99,7 +100,7 @@ def lab_project(conn):
     c4 = create_chunk(
         conn, project_id=pid, file_path="other.py", chunk_type="function",
         name="clone_func", content="def clone_func(): pass",
-        content_hash="c4_h", start_line=1, end_line=3,
+        content_hash="c4_h", start_line=1, end_line=3, last_seen_cycle=1,
     )
     create_health_score(conn, c4, cycle_id=1, volatility_score=0.5,
                         coverage_score=1.0, complexity_score=0.5,
@@ -244,7 +245,7 @@ def test_write_cycle_report(conn, lab_project, tmp_path):
         "cochange_patterns": find_cochange_patterns(conn, pid),
     }
     constraints = generate_planner_constraints(conn, "lab-test", 1, findings)
-    specialist_data = generate_specialist_update_data(conn, pid)
+    specialist_data = generate_specialist_update_data(conn, pid, 1)
     report_path = str(tmp_path / "cycle-1-report.md")
 
     write_cycle_report(
@@ -471,7 +472,7 @@ def test_cycle_report_includes_untested_complexity(conn, tmp_path):
     c_high = create_chunk(
         conn, project_id=pid, file_path="core.py", chunk_type="function",
         name="complex_untested", content="def complex_untested(): pass",
-        content_hash="uc_h1", start_line=1, end_line=10,
+        content_hash="uc_h1", start_line=1, end_line=10, last_seen_cycle=1,
     )
     create_health_score(
         conn, c_high, cycle_id=1, volatility_score=0.5,
@@ -484,7 +485,7 @@ def test_cycle_report_includes_untested_complexity(conn, tmp_path):
     c_low = create_chunk(
         conn, project_id=pid, file_path="helpers.py", chunk_type="function",
         name="simple_untested", content="def simple_untested(): pass",
-        content_hash="uc_h2", start_line=1, end_line=3,
+        content_hash="uc_h2", start_line=1, end_line=3, last_seen_cycle=1,
     )
     create_health_score(
         conn, c_low, cycle_id=1, volatility_score=0.3,
@@ -499,7 +500,7 @@ def test_cycle_report_includes_untested_complexity(conn, tmp_path):
         "cochange_patterns": [], "best_practice_deviations": [],
         "intent_gaps": [],
     }
-    specialist_data = generate_specialist_update_data(conn, pid)
+    specialist_data = generate_specialist_update_data(conn, pid, 1)
     report_path = str(tmp_path / "uc-report.md")
 
     write_cycle_report(
@@ -517,3 +518,104 @@ def test_cycle_report_includes_untested_complexity(conn, tmp_path):
     assert pos_high < pos_low, (
         "complex_untested (cov×comp=0.95) must appear before simple_untested (cov×comp=0.50)"
     )
+
+
+# --- Freshness filter tests ---
+
+def test_clone_candidates_excludes_stale_chunks(conn):
+    """find_clone_candidates excludes chunks with stale last_seen_cycle."""
+    pid = create_project(conn, "clone-filter-test", "/tmp/clone-filter-test")
+
+    # Live chunk (last_seen_cycle=1)
+    live = create_chunk(
+        conn, project_id=pid, file_path="app.py", chunk_type="function",
+        name="live_fn", content="def live_fn(): pass",
+        content_hash="live_h", start_line=1, end_line=3, last_seen_cycle=1,
+    )
+
+    # Stale chunk (last_seen_cycle=None — orphan)
+    stale = create_chunk(
+        conn, project_id=pid, file_path="app.py", chunk_type="function",
+        name="stale_fn", content="def stale_fn(): pass",
+        content_hash="stale_h", start_line=5, end_line=7,
+    )
+
+    # Similarity between live and stale
+    create_similarity(conn, live, stale, 0.95, cycle_id=1)
+
+    clones = find_clone_candidates(conn, pid, 1)
+    chunk_ids = set()
+    for c in clones:
+        chunk_ids.add(c["chunk_a_id"])
+        chunk_ids.add(c["chunk_b_id"])
+    assert stale not in chunk_ids, "Stale chunk must be excluded by freshness filter"
+
+
+def test_clone_candidates_includes_fresh_pair(conn):
+    """find_clone_candidates returns pairs where both sides are fresh."""
+    pid = create_project(conn, "clone-fresh-test", "/tmp/clone-fresh-test")
+
+    a = create_chunk(
+        conn, project_id=pid, file_path="a.py", chunk_type="function",
+        name="fn_a", content="def fn_a(): pass",
+        content_hash="a_h", start_line=1, end_line=3, last_seen_cycle=1,
+    )
+    b = create_chunk(
+        conn, project_id=pid, file_path="b.py", chunk_type="function",
+        name="fn_b", content="def fn_b(): pass",
+        content_hash="b_h", start_line=1, end_line=3, last_seen_cycle=1,
+    )
+    create_similarity(conn, a, b, 0.90, cycle_id=1)
+
+    clones = find_clone_candidates(conn, pid, 1)
+    assert len(clones) == 1
+    assert clones[0]["similarity_score"] == 0.90
+
+
+def test_best_practice_deviations_excludes_stale(conn):
+    """find_best_practice_deviations excludes chunks with wrong last_seen_cycle."""
+    pid = create_project(conn, "bp-filter-test", "/tmp/bp-filter-test")
+
+    # Stale classified chunk (last_seen_cycle=None)
+    create_chunk(
+        conn, project_id=pid, file_path="app.py", chunk_type="function",
+        name="stale_handler", content="def stale_handler(): pass",
+        content_hash="sh", start_line=1, end_line=3,
+        functional_role="route_handler",
+    )
+
+    # Fresh classified chunk (last_seen_cycle=2)
+    create_chunk(
+        conn, project_id=pid, file_path="app.py", chunk_type="function",
+        name="fresh_handler", content="def fresh_handler(): pass",
+        content_hash="fh", start_line=5, end_line=7,
+        last_seen_cycle=2, functional_role="route_handler",
+    )
+
+    results = find_best_practice_deviations(conn, pid, 2)
+    names = [r["name"] for r in results]
+    assert "stale_handler" not in names, "Stale chunk must be filtered out"
+    # fresh_handler may or may not have deviations depending on practice rules,
+    # but stale_handler must never appear
+
+
+def test_specialist_update_data_excludes_stale(conn):
+    """generate_specialist_update_data only counts chunks with matching last_seen_cycle."""
+    pid = create_project(conn, "stats-filter-test", "/tmp/stats-filter-test")
+
+    # Fresh chunk
+    create_chunk(
+        conn, project_id=pid, file_path="a.py", chunk_type="function",
+        name="fn_fresh", content="def fn_fresh(): pass",
+        content_hash="fh1", start_line=1, end_line=3, last_seen_cycle=2,
+    )
+
+    # Stale chunk (should not count)
+    create_chunk(
+        conn, project_id=pid, file_path="b.py", chunk_type="function",
+        name="fn_stale", content="def fn_stale(): pass",
+        content_hash="sh1", start_line=1, end_line=3, last_seen_cycle=1,
+    )
+
+    data = generate_specialist_update_data(conn, pid, 2)
+    assert data["total_functions"] == 1, "Only fresh chunk should be counted"

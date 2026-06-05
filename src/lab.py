@@ -63,7 +63,7 @@ def run_lab(conn, project_name: str, cycle_id: int) -> dict:
     staleness_alerts = find_staleness_alerts(conn, project_id, cycle_id)
     complexity_hotspots = find_complexity_hotspots(conn, project_id, cycle_id)
     cochange_patterns = find_cochange_patterns(conn, project_id)
-    bp_deviations = find_best_practice_deviations(conn, project_id)
+    bp_deviations = find_best_practice_deviations(conn, project_id, cycle_id)
 
     # Phase 2.1 — Intent gaps
     project_path = project.get("path", "")
@@ -87,7 +87,7 @@ def run_lab(conn, project_name: str, cycle_id: int) -> dict:
     constraints = generate_planner_constraints(
         conn, project_name, cycle_id, findings
     )
-    specialist_data = generate_specialist_update_data(conn, project_id)
+    specialist_data = generate_specialist_update_data(conn, project_id, cycle_id)
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     report_path = os.path.join(
@@ -193,8 +193,9 @@ def find_clone_candidates(conn, project_id: int, cycle_id: int) -> list[dict]:
         "JOIN code_chunks a ON cs.chunk_a_id = a.id "
         "JOIN code_chunks b ON cs.chunk_b_id = b.id "
         "WHERE cs.cycle_id = ? AND a.project_id = ? "
+        "AND a.last_seen_cycle = ? AND b.last_seen_cycle = ? "
         "ORDER BY cs.similarity_score DESC",
-        (cycle_id, project_id),
+        (cycle_id, project_id, cycle_id, cycle_id),
     )
     return [
         {
@@ -313,15 +314,16 @@ def find_cochange_patterns(conn, project_id: int) -> list[dict]:
     return results
 
 
-def find_best_practice_deviations(conn, project_id: int) -> list[dict]:
+def find_best_practice_deviations(conn, project_id: int, cycle_id: int) -> list[dict]:
     """Find chunks that deviate from best practices for their functional role."""
     # Get all classified chunks
     conn.row_factory = db._row_to_dict
     cur = conn.execute(
         "SELECT id, file_path, name, content, structural_metadata, functional_role "
         "FROM code_chunks WHERE project_id = ? AND functional_role IS NOT NULL "
-        "AND chunk_type NOT IN ('module', 'test_case')",
-        (project_id,),
+        "AND chunk_type NOT IN ('module', 'test_case') "
+        "AND last_seen_cycle = ?",
+        (project_id, cycle_id),
     )
     chunks = cur.fetchall()
     conn.row_factory = None
@@ -759,13 +761,13 @@ def generate_planner_constraints(conn, project_name: str, cycle_id: int,
     return constraints
 
 
-def generate_specialist_update_data(conn, project_id: int) -> dict:
+def generate_specialist_update_data(conn, project_id: int, cycle_id: int) -> dict:
     """Generate aggregate stats for specialist file sync."""
     counts = {}
     cur = conn.execute(
         "SELECT chunk_type, COUNT(*) FROM code_chunks "
-        "WHERE project_id = ? GROUP BY chunk_type",
-        (project_id,),
+        "WHERE project_id = ? AND last_seen_cycle = ? GROUP BY chunk_type",
+        (project_id, cycle_id),
     )
     for ctype, cnt in cur.fetchall():
         counts[ctype] = cnt
@@ -773,32 +775,33 @@ def generate_specialist_update_data(conn, project_id: int) -> dict:
     cur = conn.execute(
         "SELECT COUNT(*) FROM chunk_dependencies cd "
         "JOIN code_chunks cc ON cd.source_chunk_id = cc.id "
-        "WHERE cc.project_id = ?",
-        (project_id,),
+        "WHERE cc.project_id = ? AND cc.last_seen_cycle = ?",
+        (project_id, cycle_id),
     )
     total_deps = cur.fetchone()[0]
 
     cur = conn.execute(
         "SELECT COUNT(*) FROM chunk_similarities cs "
         "JOIN code_chunks cc ON cs.chunk_a_id = cc.id "
-        "WHERE cc.project_id = ?",
-        (project_id,),
+        "WHERE cc.project_id = ? AND cc.last_seen_cycle = ?",
+        (project_id, cycle_id),
     )
     total_sims = cur.fetchone()[0]
 
     cur = conn.execute(
         "SELECT AVG(composite_score) FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
-        "WHERE cc.project_id = ?",
-        (project_id,),
+        "WHERE cc.project_id = ? AND cc.last_seen_cycle = ?",
+        (project_id, cycle_id),
     )
     avg_score = cur.fetchone()[0] or 0.0
 
     cur = conn.execute(
         "SELECT COUNT(*) FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
-        "WHERE cc.project_id = ? AND hs.composite_score >= ?",
-        (project_id, HIGH_RISK_THRESHOLD),
+        "WHERE cc.project_id = ? AND cc.last_seen_cycle = ? "
+        "AND hs.composite_score >= ?",
+        (project_id, cycle_id, HIGH_RISK_THRESHOLD),
     )
     high_risk = cur.fetchone()[0]
 
@@ -807,9 +810,9 @@ def generate_specialist_update_data(conn, project_id: int) -> dict:
         "SELECT cc.name, cc.file_path, hs.complexity_score "
         "FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
-        "WHERE cc.project_id = ? "
+        "WHERE cc.project_id = ? AND cc.last_seen_cycle = ? "
         "ORDER BY hs.complexity_score DESC LIMIT 10",
-        (project_id,),
+        (project_id, cycle_id),
     )
     top_complex = [
         {"name": r[0], "file": r[1], "complexity_score": r[2]}
@@ -821,9 +824,9 @@ def generate_specialist_update_data(conn, project_id: int) -> dict:
         "SELECT cc.name, cc.file_path, hs.coupling_score "
         "FROM health_scores hs "
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
-        "WHERE cc.project_id = ? "
+        "WHERE cc.project_id = ? AND cc.last_seen_cycle = ? "
         "ORDER BY hs.coupling_score DESC LIMIT 10",
-        (project_id,),
+        (project_id, cycle_id),
     )
     top_coupled = [
         {"name": r[0], "file": r[1], "coupling_score": r[2]}

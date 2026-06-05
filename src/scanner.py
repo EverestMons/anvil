@@ -8,13 +8,17 @@ ingests recent git history for volatility tracking.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from typing import Optional
 
 from src import db
 from src.config import (
+    ANVIL_DB_PATH,
+    ANVIL_ROOT,
     EXCLUDED_DIRS,
     EXCLUDED_EXTENSIONS,
     GIT_HISTORY_WEEKS,
@@ -42,6 +46,10 @@ def scan_project(conn, project_name: str) -> dict:
         project_id = project["id"]
 
     discovered = discover_files(project_path, EXCLUDED_DIRS, EXCLUDED_EXTENSIONS)
+
+    on_disk_paths = {f["relative_path"] for f in discovered}
+    prune_deleted_file_orphans(conn, project_id, on_disk_paths)
+
     new_files, changed_files, unchanged_files = detect_changes(
         conn, project_id, discovered
     )
@@ -94,6 +102,79 @@ def discover_files(project_path: str, excluded_dirs: set,
                 "size_bytes": os.path.getsize(abs_path),
             })
     return sorted(files, key=lambda f: f["relative_path"])
+
+
+def prune_deleted_file_orphans(conn, project_id: int,
+                                on_disk_paths: set[str]) -> dict:
+    """
+    Remove all code_chunks for files no longer on disk.
+
+    Scoped to the given project_id. Cascade handles dependent rows
+    in chunk_symbol_bindings, chunk_dependencies, chunk_similarities,
+    chunk_provenance, chunk_fingerprints, and health_scores.
+    """
+    cur = conn.execute(
+        "SELECT DISTINCT file_path FROM code_chunks WHERE project_id = ?",
+        (project_id,),
+    )
+    db_file_paths = {r[0] for r in cur.fetchall()}
+
+    orphan_fps = db_file_paths - on_disk_paths
+    if not orphan_fps:
+        return {"pruned_files": 0, "pruned_chunks": 0}
+
+    backup_dir = os.path.join(ANVIL_ROOT, "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    backup_path = os.path.join(backup_dir, f"anvil-backup-{timestamp}.db")
+    if os.path.isfile(ANVIL_DB_PATH):
+        shutil.copy2(ANVIL_DB_PATH, backup_path)
+        logging.info("Pre-prune backup created: %s", backup_path)
+
+    placeholders = ",".join(["?"] * len(orphan_fps))
+    cur = conn.execute(
+        f"SELECT COUNT(*) FROM code_chunks "
+        f"WHERE project_id = ? AND file_path IN ({placeholders})",
+        (project_id, *orphan_fps),
+    )
+    total_chunks = cur.fetchone()[0]
+
+    cur = conn.execute(
+        f"SELECT COUNT(*) FROM code_chunks "
+        f"WHERE project_id = ? AND chunk_type = 'module' "
+        f"AND file_path IN ({placeholders})",
+        (project_id, *orphan_fps),
+    )
+    module_count = cur.fetchone()[0]
+    child_count = total_chunks - module_count
+
+    cur = conn.execute(
+        f"SELECT id FROM code_chunks "
+        f"WHERE project_id = ? AND file_path IN ({placeholders}) LIMIT 5",
+        (project_id, *orphan_fps),
+    )
+    sample_ids = [r[0] for r in cur.fetchall()]
+
+    conn.execute(
+        f"DELETE FROM code_chunks "
+        f"WHERE project_id = ? AND file_path IN ({placeholders})",
+        (project_id, *orphan_fps),
+    )
+    conn.commit()
+
+    logging.info(
+        "Pruned %d orphan chunks (%d modules, %d children) "
+        "for %d deleted files. Sample chunk IDs: %s",
+        total_chunks, module_count, child_count,
+        len(orphan_fps), sample_ids,
+    )
+
+    return {
+        "pruned_files": len(orphan_fps),
+        "pruned_chunks": total_chunks,
+        "pruned_modules": module_count,
+        "pruned_children": child_count,
+    }
 
 
 def compute_file_hash(file_path: str) -> Optional[str]:
