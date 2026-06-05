@@ -6,6 +6,16 @@ Lightweight capture of mid-session observations and deferred work. Each entry is
 
 ## Open
 
+### 2026-06-05 — (d2) volatility floor is not persisted; cycle 18–19 QA floor-invariant check was wrong-layer and never evaluated
+
+Surfaced during the cycle-plan-template review (BACKLOG 2026-06-02, closed). The (d2) floor (`scorer.py:332`: `if coverage >= 0.99: volatility = max(volatility, ZERO_COVERAGE_VOLATILITY_FLOOR)`, floor=0.5) is applied as a **local variable inside `compute_composite`** and fed to the weighted composite — but the raised value is **never written back to `health_scores.volatility_score`**. The persisted column keeps the raw percentile-normalized volatility.
+
+Consequence: the per-cycle QA check carried in the cycle-18 and cycle-19 executables — `SELECT COUNT(*) FROM health_scores WHERE project='invoice-pulse' AND cycle_number=N AND coverage_score >= 0.99 AND volatility_score < 0.5`, asserted "Expected: 0" — is wrong on two counts. (a) It targets the raw `volatility_score` column, which by design retains sub-0.5 values for floored chunks; run correctly against cycle 20 it returns **1235**, not 0. (b) It never actually evaluated in cycles 18–19: the query references a non-existent `project` column (real key is `project_id`) and `cycle_number` (absent from `health_scores`; the column is `cycle_id`), so it threw `no such column: project` and the traceback sat in the evidence file unverified. The new template drops this check entirely — the floor logic is covered by the scorer unit suite, which the QA `pytest tests/` gate runs.
+
+**Decision fork (CEO), not a bug to auto-fix:** do we want a *persisted* floored-volatility signal at all? Options: (a) leave as-is — floor stays a composite-time transform, unit-tested, no DB invariant (status quo, zero work); (b) persist a separate `composite_volatility` (floored) column on `health_scores` so downstream consumers and a correct per-cycle invariant become possible; (c) add a correct composite-layer invariant to QA without a schema change (assert no coverage≥0.99 chunk has a composite below its floored-volatility lower bound). **Recommendation:** (a) — the floor's only job is to keep zero-coverage chunks from ranking artificially safe in the composite, which it does and which the unit suite already protects. Revisit only if a downstream consumer needs the floored value directly.
+
+**Priority:** Low (documentation/methodology; no active failure — the only artifact was a silently-erroring QA check now removed).
+
 ### 2026-06-05 — Scanner creates duplicate module rows for the same file_path across cycles
 
 **Closed 2026-06-05:** Diagnostic found no ongoing bug — `detect_changes()` already guards against duplication. The 1,182 excess rows were a historical one-time double-insert (contiguous ID block starting at 5754, all adjacent pairs, all `cycle_id=None`). One-time dedup DELETE removed all 1,182 duplicates (5,213 → 4,031 module chunks, 0 FK violations). No code change needed. Backup at `backups/anvil-backup-dedup-20260605-175815.db`.
@@ -29,6 +39,8 @@ The phantom fix scoped the scorer and `find_intent_gaps()` to `last_seen_cycle =
 **Residual (Low):** Cycle 20 is a structural breakpoint for `compare_cycles()` — any cross-boundary comparison (cycle ≤19 vs ≥20) reports ~487 spurious "removed" chunks (orphan exclusions, not code deletions). One-time step, not cumulative; post-fix (20+ vs 20+) comparisons are clean. Optional: annotate the cycle-20 `cycle_reports` record, or have cross-boundary consumers discount the ~487 — only worth doing if cross-boundary comparisons are actually performed.
 
 ### 2026-06-02 — Anvil cycle plan template needs 3 fixes for clean Bellows dispatch
+
+**Closed 2026-06-05:** Canonical template authored at `knowledge/architecture/cycle-plan-template.md` (commit `019e028`), replacing the copy-the-prior-cycle habit. All 3 fixes landed: (1) `**Dispatch Mode:** bellows` in header (Rule 35), (2) audit-findings + cycle-report deposits declared with the UTC date (gate `_resolve_deposit_path` matches literally — no glob — so local-date declarations fail; authoring rule 2 covers the boundary), (3) canonical cycle report declared as a DEV deposit + Planner wrap-commits it on main before the terminal close verdict (it's a tracked artifact, not gitignored). Review also fixed broken `WHERE project=...` queries inherited from cycle-18/19 (real column is `project_id`; no `cycle_date`; `health_scores` joins via `chunk_id`) and dropped a wrong-layer floor-invariant check — see new Open entry below.
 
 Cycle 19 was dispatched via Bellows (first since the F8 ANVIL_ROOT fix). The run succeeded but tripped 3 claim/teardown gates, all from authoring the plan off the cycle-18 template:
 1. **Missing `**Dispatch Mode:**` field** — Rule 35 (`validate_at_claim`) rejects plans lacking it, moving them to `halted-`. The cycle-18 template predates Rule 35.
