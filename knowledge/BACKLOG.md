@@ -12,9 +12,13 @@ The orphan-reconciliation blueprint sizing (2026-06-05) found **2,400 module chu
 
 ### 2026-06-03 — File-set reconciliation: prune chunks for deleted files (DB hygiene)
 
+**Closed 2026-06-05:** Fixed by `executable-anvil-orphan-chunk-reconciliation-2026-06-05.md`. Prune of deleted-file orphans implemented in `scanner.py:prune_deleted_file_orphans()`, called after `discover_files()`. 2,652 orphan chunks (2,400 modules + 252 children across 1,601 file_paths) pruned with clean cascade. Pre-prune timestamped backup, idempotent re-run. Commit `aa7c4c8`. QA PASS (238/238 tests).
+
 The intent-gap phantom fix (last_seen_cycle, 2026-06-03) handles deleted-file orphans at the *filter* level — the extractor `continue`s on missing files, so their chunks never get stamped and are excluded from scoring/findings. But the rows persist. The (a2) sizing during that fix found **1,599 orphan module chunks** for invoice-pulse (files no longer on disk): 1,560 JSON, 22 md/html, 17 .py (16 test files, 1 production: `web/training.py` with 20 child chunks). None currently surface as findings (filtered), so this is DB hygiene, not correctness. **Fix when picked up:** after `discover_files()` in SCAN, compute DB-module-chunks minus on-disk-files and DELETE (or flag) the orphans + their children. Coordinate with the non-destructive philosophy — if deleting, handle `chunk_dependencies`/`similarities`/`symbol_bindings`/`provenance` cascades. **Priority:** Low.
 
 ### 2026-06-03 — `find_clone_candidates` reads `chunk_similarities`, not `health_scores` — residual phantom surface
+
+**Closed 2026-06-05:** Fixed by `executable-anvil-orphan-chunk-reconciliation-2026-06-05.md`. Added `last_seen_cycle = ?` filter to `find_clone_candidates` (both sides: `a.last_seen_cycle` and `b.last_seen_cycle`), `find_best_practice_deviations`, and all 7 `generate_specialist_update_data` queries. Full bypass-surface audit confirmed no other unprotected readers produce findings. Commit `aa7c4c8`. QA PASS (238/238 tests).
 
 The phantom fix scoped the scorer and `find_intent_gaps()` to `last_seen_cycle = current`, which transitively fixes every Lab finding type that flows through `health_scores`. But `find_clone_candidates` (`lab.py:193-194`) reads `chunk_similarities` directly and does NOT go through `health_scores`, so dead/orphan chunks can still surface as clone candidates. Lower-impact (different finding type, not the high-traffic intent-gap surface) but it's the same class of bug the phantom fix closed elsewhere. **Fix when picked up:** add a `last_seen_cycle = current` join/filter to `find_clone_candidates` (and audit role/chunk stats at `lab.py:322,763` for the same issue). **Priority:** Low.
 
