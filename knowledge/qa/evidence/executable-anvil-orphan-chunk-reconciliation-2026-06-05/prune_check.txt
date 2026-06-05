@@ -1,0 +1,42 @@
+Prune Correctness Check — Evidence
+====================================
+Date: 2026-06-05 | Agent: Anvil QA Analyst
+DB copy: /tmp/anvil-qa-prune-test.db (cp of /Users/marklehn/Developer/GitHub/anvil/anvil.db)
+PRAGMA foreign_keys=ON confirmed before all operations.
+
+=== BEFORE PRUNE ===
+  code_chunks: 9,388
+  chunk_symbol_bindings: 815,316
+  chunk_dependencies: 3,158,992
+  chunk_similarities: 10,353
+  chunk_provenance: 15,611
+  health_scores: 77,265
+  chunk_fingerprints: 86,973
+
+Named production orphan (web/training.py) module chunks: 1 (present)
+On-disk files (scanner exclusions): 2,433
+DB file_paths: 4,031
+Orphan file_paths (to prune): 1,601
+Total orphan chunks: 2,652 (modules: 2,400, children: 252)
+
+=== AFTER PRUNE (DELETE on DB copy) ===
+  code_chunks: 6,736 (delta: -2,652) -- matches blueprint exactly
+  chunk_symbol_bindings: 805,377 (delta: -9,939) -- matches blueprint
+  chunk_dependencies: 3,076,021 (delta: -82,971) -- matches blueprint
+  chunk_similarities: 4,696 (delta: -5,657) -- matches blueprint
+  chunk_provenance: 15,543 (delta: -68) -- matches blueprint
+  health_scores: 72,225 (delta: -5,040) -- matches blueprint
+  chunk_fingerprints: 79,014 (delta: -7,959) -- matches blueprint
+
+=== VERIFICATION ===
+Foreign key violations (PRAGMA foreign_key_check): 0
+web/training.py after prune (named production orphan): 0 -- GONE
+Live chunks before prune: 6,736
+Live chunks after prune: 6,736 -- UNTOUCHED
+Remaining orphan file_paths after prune: 0 -- ALL REMOVED
+Count delta equals exactly the pruned total: YES (9,388 - 2,652 = 6,736)
+
+=== CONCLUSION ===
+PASS: Prune correctly removes all (a2) deleted-file orphans (2,652 chunks across 1,601 file_paths).
+Cascade cleans all dependent tables. No FK violations. Live chunks untouched.
+All figures match blueprint section (3) exactly.

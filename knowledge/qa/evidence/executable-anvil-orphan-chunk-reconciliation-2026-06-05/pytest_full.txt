@@ -1,0 +1,35 @@
+Full Test Suite — Evidence
+==========================
+Date: 2026-06-05 | Agent: Anvil QA Analyst
+Command: python3 -m pytest tests/ -v
+
+Result: 238 passed in 2.73s
+
+All tests green. No pre-existing failures. No new failures.
+
+Test files executed:
+  tests/test_best_practices.py — 16 tests
+  tests/test_classifier.py — 22 tests
+  tests/test_cycle.py — 6 tests
+  tests/test_db.py — 33 tests (includes new test_cascade_delete_removes_all_dependent_rows)
+  tests/test_detector.py — 17 tests (3 updated for signature change)
+  tests/test_extractor.py — 18 tests
+  tests/test_lab.py — 25 tests (includes 4 new freshness filter tests)
+  tests/test_provenance.py — 10 tests
+  tests/test_python_parser.py — 24 tests
+  tests/test_scanner.py — 23 tests (includes 4 new prune tests)
+  tests/test_scorer.py — 19 tests
+
+New tests added by this plan:
+  test_scanner.py:
+    - test_prune_removes_orphan_chunks
+    - test_prune_creates_backup
+    - test_prune_idempotent
+    - test_prune_no_orphans_no_backup
+  test_lab.py:
+    - test_clone_candidates_excludes_stale_chunks
+    - test_clone_candidates_includes_fresh_pair
+    - test_best_practice_deviations_excludes_stale
+    - test_specialist_update_data_excludes_stale
+  test_db.py:
+    - test_cascade_delete_removes_all_dependent_rows

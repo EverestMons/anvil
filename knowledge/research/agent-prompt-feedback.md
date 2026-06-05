@@ -99,3 +99,9 @@
 **Plan step:** Step 2 — implementation of bypass-surface freshness filters.
 **What happened:** The blueprint's test surface (§8) listed `test_scanner.py`, `test_lab.py`, `test_db.py`, and `test_cycle.py` as files to update. It did not mention `test_detector.py`, which also calls `find_best_practice_deviations()` directly (3 calls). The signature change from `(conn, project_id)` to `(conn, project_id, cycle_id)` broke those tests. Fixed by adding `cycle_id=1` and `last_seen_cycle=1` to those test fixtures.
 **Recommendation:** Blueprint §8 test-surface enumeration should grep for all callers of functions whose signatures change, not just the primary test files. `grep -r "find_best_practice_deviations" tests/` would have caught test_detector.py.
+
+### 2026-06-05 — QA Step 3: no new issues — clean execution
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 3 — QA verification of orphan-chunk reconciliation.
+**What happened:** QA executed cleanly. All deliverables verified, prune correctness confirmed on DB copy (all deltas match blueprint exactly), bypass-surface filters confirmed working, 238/238 tests passed. The worktree path issue (no `anvil/` prefix, DB in main repo) is previously documented and was handled without friction.
+**Recommendation:** No new prompt feedback. Plan's QA step was well-specified with clear evidence-file requirements and verification criteria.

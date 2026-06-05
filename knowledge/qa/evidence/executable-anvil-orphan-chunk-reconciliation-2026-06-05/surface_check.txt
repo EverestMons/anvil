@@ -1,0 +1,38 @@
+Bypass-Surface Filter Check — Evidence
+========================================
+Date: 2026-06-05 | Agent: Anvil QA Analyst
+DB: /tmp/anvil-qa-prune-test.db (post-prune copy)
+
+Filter status: INCLUDED (per blueprint recommendation, CEO-approved)
+
+=== (a1) Surviving-File Orphan Population (post-prune) ===
+Non-module chunks with last_seen_cycle != 20: 235 (matches blueprint)
+
+=== find_clone_candidates ===
+Clone candidates WITHOUT filter (old query): 279
+Clone candidates WITH filter (new query): 191
+  (a1) orphans excluded by filter: 88
+Note: Blueprint pre-prune figure was 154 (a1) rows. Post-prune, cascade removed
+similarity rows where one/both sides were (a2), leaving 88 purely (a1) rows. Correct.
+
+=== find_best_practice_deviations ===
+BP deviations candidates WITHOUT filter: 1,880
+BP deviations candidates WITH filter: 1,726
+  (a1) orphans excluded by filter: 154 (matches blueprint exactly)
+
+Blueprint-named (a1) samples:
+  chunk 953 (_table_exists, app.py): last_seen_cycle=None -> EXCLUDED by filter
+  chunk 962 (_determine_acc_alignment, app.py): last_seen_cycle=None -> EXCLUDED by filter
+  chunk 976 (patterns_page, app.py): last_seen_cycle=None -> EXCLUDED by filter
+
+=== generate_specialist_update_data ===
+All chunks post-prune: 6,736
+Only last_seen_cycle=20 (filtered): 3,940
+  Stale chunks excluded from stats: 2,796
+
+The specialist count drop matches prune + filter: only current-cycle chunks counted.
+
+=== CONCLUSION ===
+PASS: All three bypass surfaces correctly filter (a1) surviving-file orphans via
+last_seen_cycle = cycle_id. Named (a1) samples confirmed excluded. The filter
+is load-bearing (154 BP deviations, 88 clone rows would otherwise leak through).

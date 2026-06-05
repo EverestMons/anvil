@@ -1,7 +1,7 @@
 # Anvil — Project Status
 
 **Status:** Operational
-**Last Updated:** 2026-06-03 (cycle 20)
+**Last Updated:** 2026-06-05 (orphan-chunk reconciliation)
 
 ---
 
@@ -10,6 +10,8 @@
 Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated against invoice-pulse. Cross-validated against specialist file facts (10/10 PASS). Findings quality assessed — coverage gaps are highest-value (81% signal), Planner integration protocol defined.
 
 ## Completed Milestones
+
+- **2026-06-05: Orphan-chunk reconciliation shipped (deleted-file prune + bypass-surface freshness filters)** — Two-part fix for orphan `code_chunks` rows leaking through Lab paths that bypass `health_scores`. **(a2) Deleted-file prune:** `prune_deleted_file_orphans()` added to `scan_project()` after `discover_files()`, removes all chunks whose source file no longer exists on disk (2,652 chunks across 1,601 file_paths pruned at cycle 20; 2,400 modules + 252 children). Pre-prune timestamped backup to `backups/`. CASCADE handles all 7 dependent tables. CEO-approved destructive operation (path (a), 2026-06-05). **(a1) Bypass-surface freshness filters:** `last_seen_cycle = cycle_id` filter added to `find_clone_candidates` (both sides), `find_best_practice_deviations` (signature change: +cycle_id), and all 7 queries in `generate_specialist_update_data` (signature change: +cycle_id). Excludes 154 BP deviations and 88 clone candidates from surviving-file orphans. 238 tests pass (9 new: 4 prune, 4 filter, 1 cascade). QA PASS. SA blueprint: `knowledge/architecture/orphan-chunk-reconciliation-blueprint-2026-06-05.md`. Dev log: `knowledge/development/orphan-chunk-reconciliation-2026-06-05.md`. QA: `knowledge/qa/orphan-chunk-reconciliation-qa-2026-06-05.md`. Plan: `executable-anvil-orphan-chunk-reconciliation-2026-06-05.md`.
 
 - **2026-06-03: Intent-gap phantom-function fix shipped (last_seen_cycle)** — Diagnostic named the mechanism: stale orphan chunks in surviving files (a1), uniform across all 5 phantoms. Extractor upserts present functions but never pruned removed ones; scorer scored all chunks indiscriminately; find_intent_gaps had no freshness gate. Fix: added `last_seen_cycle INTEGER` column to `code_chunks`, stamped during extraction (4 paths including unchanged-chunk trap), scoped scorer to `last_seen_cycle = cycle_id`, added belt-and-suspenders guard to all 3 find_intent_gaps query buckets. Non-destructive (philosophy A) — no DELETEs, all historical data preserved. (a2) population sized at 1,599 orphan module chunks (only 1 production Python file); deferred to BACKLOG since last_seen_cycle handles at filter level. Cycle 20 validated: 3,688 chunks scored (down from 4,175 — 487 inert orphans excluded, 11.7%; the earlier "~5,700+" figure conflated total chunk count with scored count), 15 findings (0 phantoms vs 2 in cycle 19), all 5 named phantom chunk_ids unstamped (NULL). 229 tests pass (10 new). QA PASS. SA blueprint: `knowledge/architecture/intent-gap-phantom-fix-blueprint-2026-06-03.md`. Diagnostic: `knowledge/research/intent-gap-phantom-mechanism-2026-06-03.md`. Plan: `executable-anvil-intent-gap-phantom-fix-2026-06-03.md`.
 

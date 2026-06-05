@@ -1,0 +1,96 @@
+Deliverable Verification — Grep Evidence
+==========================================
+Date: 2026-06-05 | Agent: Anvil QA Analyst
+
+--- 1. Prune function in scanner.py ---
+$ grep -n "def prune_deleted_file_orphans" src/scanner.py
+107:def prune_deleted_file_orphans(conn, project_id: int,
+
+$ grep -n "prune_deleted_file_orphans" src/scanner.py
+51:    prune_deleted_file_orphans(conn, project_id, on_disk_paths)
+107:def prune_deleted_file_orphans(conn, project_id: int,
+
+--- 2. Scanner imports (logging, shutil, ANVIL_DB_PATH, ANVIL_ROOT) ---
+$ grep -n "import logging\|import shutil\|ANVIL_DB_PATH\|ANVIL_ROOT" src/scanner.py
+11:import logging
+13:import shutil
+20:    ANVIL_DB_PATH,
+21:    ANVIL_ROOT,
+126:    backup_dir = os.path.join(ANVIL_ROOT, "backups")
+130:    if os.path.isfile(ANVIL_DB_PATH):
+131:        shutil.copy2(ANVIL_DB_PATH, backup_path)
+
+--- 3. Freshness filter in find_clone_candidates (lab.py) ---
+$ grep -n "last_seen_cycle" src/lab.py
+196:        "AND a.last_seen_cycle = ? AND b.last_seen_cycle = ? "
+
+VERIFIED: Both sides (a + b) filtered.
+
+--- 4. Freshness filter in find_best_practice_deviations (lab.py) ---
+$ grep -n "def find_best_practice_deviations" src/lab.py
+317:def find_best_practice_deviations(conn, project_id: int, cycle_id: int) -> list[dict]:
+
+$ grep -n "last_seen_cycle" src/lab.py | grep 325
+325:        "AND last_seen_cycle = ?",
+
+VERIFIED: Signature includes cycle_id; query filters on last_seen_cycle.
+
+--- 5. Freshness filter in generate_specialist_update_data (lab.py) ---
+$ grep -n "def generate_specialist_update_data" src/lab.py
+764:def generate_specialist_update_data(conn, project_id: int, cycle_id: int) -> dict:
+
+last_seen_cycle filter lines in generate_specialist_update_data:
+769:  "WHERE project_id = ? AND last_seen_cycle = ? GROUP BY chunk_type"
+778:  "WHERE cc.project_id = ? AND cc.last_seen_cycle = ?"
+786:  "WHERE cc.project_id = ? AND cc.last_seen_cycle = ?"
+794:  "WHERE cc.project_id = ? AND cc.last_seen_cycle = ?"
+802:  "WHERE cc.project_id = ? AND cc.last_seen_cycle = ?"
+813:  "WHERE cc.project_id = ? AND cc.last_seen_cycle = ?"
+827:  "WHERE cc.project_id = ? AND cc.last_seen_cycle = ?"
+
+VERIFIED: All 7 queries filtered.
+
+--- 6. Call site updates in run_lab() ---
+$ grep -n "find_best_practice_deviations(conn, project_id, cycle_id)" src/lab.py
+66:    bp_deviations = find_best_practice_deviations(conn, project_id, cycle_id)
+
+$ grep -n "generate_specialist_update_data(conn, project_id, cycle_id)" src/lab.py
+90:    specialist_data = generate_specialist_update_data(conn, project_id, cycle_id)
+
+VERIFIED: Both call sites pass cycle_id.
+
+--- 7. New tests in test_scanner.py (4 prune tests) ---
+$ grep -n "def test_prune" tests/test_scanner.py
+350:def test_prune_removes_orphan_chunks(conn, temp_project):
+395:def test_prune_creates_backup(conn, temp_project, tmp_path, monkeypatch):
+421:def test_prune_idempotent(conn, temp_project):
+442:def test_prune_no_orphans_no_backup(conn, temp_project, tmp_path, monkeypatch):
+
+VERIFIED: 4 tests present.
+
+--- 8. New tests in test_lab.py (4 freshness filter tests) ---
+$ grep -n "def test_clone_candidates_excludes\|def test_clone_candidates_includes\|def test_best_practice_deviations_excludes\|def test_specialist_update_data_excludes" tests/test_lab.py
+525:def test_clone_candidates_excludes_stale_chunks(conn):
+554:def test_clone_candidates_includes_fresh_pair(conn):
+575:def test_best_practice_deviations_excludes_stale(conn):
+602:def test_specialist_update_data_excludes_stale(conn):
+
+VERIFIED: 4 tests present.
+
+--- 9. New test in test_db.py (cascade test) ---
+$ grep -n "def test_cascade_delete" tests/test_db.py
+474:def test_cascade_delete_removes_all_dependent_rows(conn, project_id):
+
+VERIFIED: 1 test present.
+
+--- 10. Updated tests in test_detector.py (signature changes) ---
+$ grep -n "find_best_practice_deviations\|last_seen_cycle" tests/test_detector.py
+14:from src.lab import find_best_practice_deviations
+186:  last_seen_cycle=1,
+194:  deviations = find_best_practice_deviations(conn, pid, 1)
+218:  last_seen_cycle=1,
+226:  deviations = find_best_practice_deviations(conn, pid, 1)
+240:  last_seen_cycle=1,
+243:  deviations = find_best_practice_deviations(conn, pid, 1)
+
+VERIFIED: 3 existing tests updated with cycle_id param and last_seen_cycle on chunks.
