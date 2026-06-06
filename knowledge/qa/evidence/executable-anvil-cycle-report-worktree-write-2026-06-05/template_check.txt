@@ -1,0 +1,12 @@
+33:3. **The cycle report lands in the worktree, not canonical main.** `run_cycle`
+35:   (`ANVIL_RUNTIME_ROOT`), which resolves to the worktree during a Bellows
+38:   before the worktree commit — the DEV step contains an explicit `git add`
+39:   instruction for this (see STEP 1 below). No Planner wrap-commit on main is
+40:   needed; the report rides the worktree commit and lands on main at teardown.
+117:> **Working directory note:** Bellows runs this plan in a worktree at `anvil/.bellows-worktrees/anvil-cycle-<N>-<LOCAL>/`; the worktree IS the anvil root from your perspective. For Anvil source imports use relative paths (e.g., `from src.cycle import run_cycle`). **For DB access use the absolute canonical path** `/Users/marklehn/Developer/GitHub/anvil/anvil.db`. The cycle report lands in the WORKTREE at `knowledge/research/cycle-<N>-findings-<UTC>.md` (via `ANVIL_RUNTIME_ROOT`). The DB record stores the canonical path (`ANVIL_ROOT`), which becomes valid after teardown lands the worktree commits to main.
+156:> (2) Locate the audit findings file. Per F8 + UTC stamping it is at `/Users/marklehn/Developer/GitHub/invoice-pulse/knowledge/anvil/audit-findings-<UTC>.md` (canonical path, UTC date, NOT worktree-local). Confirm it exists there. If worktree-local, FLAG for CEO — F8 is not working.
+158:> (3) Locate the cycle report at `knowledge/research/cycle-<N>-findings-<UTC>.md` (worktree-relative path, UTC date). Confirm it exists and print its exact filename verbatim. The file lands in the worktree via `ANVIL_RUNTIME_ROOT`; step (10) stages it for commit.
+172:> **(10) Stage the cycle report for commit.** The report lands in the worktree and
+173:> MUST be committed with the worktree's changes:
+206:> **(2) Audit findings file at canonical path.** `ls -la /Users/marklehn/Developer/GitHub/invoice-pulse/knowledge/anvil/audit-findings-<UTC>.md > knowledge/qa/evidence/executable-anvil-cycle-<N>-<LOCAL>/findings_file_path.txt 2>&1`. Expected: exists. ❌ if missing or worktree-local.
+208:> **(3) Cycle report in worktree.** `ls -la knowledge/research/cycle-<N>-findings-<UTC>.md > knowledge/qa/evidence/executable-anvil-cycle-<N>-<LOCAL>/cycle_report_path.txt 2>&1`. Expected: exists at worktree-relative path with UTC date. ❌ if missing. Also verify it is staged: `git diff --cached --name-only | grep cycle-<N>-findings > knowledge/qa/evidence/executable-anvil-cycle-<N>-<LOCAL>/cycle_report_staged.txt 2>&1`. Expected: ≥1 match.
