@@ -22,6 +22,8 @@ EXCLUDED_DIRS = {
     ".vexp",
     "target",
     ".tox",
+    ".bellows-worktrees",
+    ".bellows-cache",
 }
 
 EXCLUDED_EXTENSIONS = {
