@@ -1,0 +1,9 @@
+143:def find_coupling_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
+144-    """Find highly coupled chunks, using role-specific thresholds."""
+145-    min_threshold = min(
+146-        (rt.get("coupling_hotspot_threshold", COUPLING_HOTSPOT_THRESHOLD)
+147-         for rt in ROLE_THRESHOLDS.values()),
+157:        "AND cc.project_id = ? "
+158-        "ORDER BY hs.coupling_score DESC",
+159-        (cycle_id, min_threshold, project_id),
+--- find_coupling_hotspots (line 157): AND cc.project_id = ? PRESENT ---

@@ -124,8 +124,9 @@ def find_coverage_gaps(conn, project_id: int, cycle_id: int) -> list[dict]:
         "WHERE hs.cycle_id = ? AND hs.coverage_score >= ? "
         "AND hs.composite_score >= ? AND cc.chunk_type != 'test_case' "
         "AND cc.file_path NOT LIKE 'tests/%' "
+        "AND cc.project_id = ? "
         "ORDER BY hs.composite_score DESC",
-        (cycle_id, COVERAGE_GAP_THRESHOLD, HIGH_RISK_THRESHOLD),
+        (cycle_id, COVERAGE_GAP_THRESHOLD, HIGH_RISK_THRESHOLD, project_id),
     )
     results = []
     for r in cur.fetchall():
@@ -153,8 +154,9 @@ def find_coupling_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
         "JOIN code_chunks cc ON hs.chunk_id = cc.id "
         "WHERE hs.cycle_id = ? AND hs.coupling_score >= ? "
         "AND cc.file_path NOT LIKE 'tests/%' "
+        "AND cc.project_id = ? "
         "ORDER BY hs.coupling_score DESC",
-        (cycle_id, min_threshold),
+        (cycle_id, min_threshold, project_id),
     )
     results = []
     for r in cur.fetchall():

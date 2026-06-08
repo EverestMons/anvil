@@ -635,6 +635,113 @@ def test_best_practice_deviations_excludes_stale(conn):
     # but stale_handler must never appear
 
 
+def test_finding_functions_project_scoped(conn):
+    """Regression: finding functions must not leak across projects sharing a cycle_id.
+
+    Seeds two projects (proj_a, proj_b) both with cycle_id=1 and qualifying
+    health_scores. Asserts each finding function returns ONLY the requested
+    project's chunks — zero cross-project contamination.
+
+    This test would FAIL against pre-fix code where find_coverage_gaps and
+    find_coupling_hotspots lacked cc.project_id constraints.
+    """
+    # --- Setup: two projects sharing cycle_id=1 ---
+    proj_a_id = create_project(conn, "proj-a", "/tmp/proj-a")
+    proj_b_id = create_project(conn, "proj-b", "/tmp/proj-b")
+
+    # proj_a chunks
+    a1 = create_chunk(
+        conn, project_id=proj_a_id, file_path="app_a.py", chunk_type="function",
+        name="func_a1", content="def func_a1(): pass",
+        content_hash="a1_h", start_line=1, end_line=10, last_seen_cycle=1,
+    )
+    meta_a1 = json.dumps({"cyclomatic_complexity": 15, "nesting_depth": 4, "parameter_count": 3,
+                           "import_count": 0, "has_docstring": False, "line_count": 10})
+    conn.execute("UPDATE code_chunks SET structural_metadata = ? WHERE id = ?", (meta_a1, a1))
+    conn.commit()
+    create_health_score(conn, a1, cycle_id=1, volatility_score=0.9,
+                        coverage_score=1.0, complexity_score=0.95,
+                        coupling_score=0.90, staleness_score=0.85,
+                        composite_score=0.80)
+
+    # proj_b chunks — same cycle_id=1, distinct file/name
+    b1 = create_chunk(
+        conn, project_id=proj_b_id, file_path="app_b.py", chunk_type="function",
+        name="func_b1", content="def func_b1(): pass",
+        content_hash="b1_h", start_line=1, end_line=10, last_seen_cycle=1,
+    )
+    meta_b1 = json.dumps({"cyclomatic_complexity": 18, "nesting_depth": 5, "parameter_count": 4,
+                           "import_count": 0, "has_docstring": False, "line_count": 10})
+    conn.execute("UPDATE code_chunks SET structural_metadata = ? WHERE id = ?", (meta_b1, b1))
+    conn.commit()
+    create_health_score(conn, b1, cycle_id=1, volatility_score=0.95,
+                        coverage_score=1.0, complexity_score=0.90,
+                        coupling_score=0.85, staleness_score=0.90,
+                        composite_score=0.85)
+
+    # Dependencies for coupling hotspot inbound/outbound counts
+    a2 = create_chunk(
+        conn, project_id=proj_a_id, file_path="lib_a.py", chunk_type="function",
+        name="helper_a", content="def helper_a(): pass",
+        content_hash="a2_h", start_line=1, end_line=3, last_seen_cycle=1,
+    )
+    create_dependency(conn, a2, a1, "call", "cross_file")
+
+    b2 = create_chunk(
+        conn, project_id=proj_b_id, file_path="lib_b.py", chunk_type="function",
+        name="helper_b", content="def helper_b(): pass",
+        content_hash="b2_h", start_line=1, end_line=3, last_seen_cycle=1,
+    )
+    create_dependency(conn, b2, b1, "call", "cross_file")
+
+    # --- Test find_coverage_gaps ---
+    gaps_a = find_coverage_gaps(conn, proj_a_id, 1)
+    gaps_b = find_coverage_gaps(conn, proj_b_id, 1)
+
+    gap_names_a = {g["name"] for g in gaps_a}
+    gap_names_b = {g["name"] for g in gaps_b}
+
+    assert "func_a1" in gap_names_a, "proj_a's chunk must appear for proj_a"
+    assert "func_b1" not in gap_names_a, "proj_b's chunk must NOT appear for proj_a"
+    assert "func_b1" in gap_names_b, "proj_b's chunk must appear for proj_b"
+    assert "func_a1" not in gap_names_b, "proj_a's chunk must NOT appear for proj_b"
+
+    # --- Test find_coupling_hotspots ---
+    hotspots_a = find_coupling_hotspots(conn, proj_a_id, 1)
+    hotspots_b = find_coupling_hotspots(conn, proj_b_id, 1)
+
+    hotspot_names_a = {h["name"] for h in hotspots_a}
+    hotspot_names_b = {h["name"] for h in hotspots_b}
+
+    assert "func_b1" not in hotspot_names_a, "proj_b's chunk must NOT appear in proj_a coupling"
+    assert "func_a1" not in hotspot_names_b, "proj_a's chunk must NOT appear in proj_b coupling"
+
+    # If hotspots found, they must belong to the correct project
+    for h in hotspots_a:
+        row = conn.execute("SELECT project_id FROM code_chunks WHERE id = ?", (h["chunk_id"],)).fetchone()
+        assert row[0] == proj_a_id, f"Coupling hotspot chunk {h['chunk_id']} should belong to proj_a"
+    for h in hotspots_b:
+        row = conn.execute("SELECT project_id FROM code_chunks WHERE id = ?", (h["chunk_id"],)).fetchone()
+        assert row[0] == proj_b_id, f"Coupling hotspot chunk {h['chunk_id']} should belong to proj_b"
+
+    # --- Non-regression: already-scoped functions ---
+    # find_staleness_alerts
+    stale_a = find_staleness_alerts(conn, proj_a_id, 1)
+    stale_b = find_staleness_alerts(conn, proj_b_id, 1)
+    for s in stale_a:
+        assert s["name"] != "func_b1", "Staleness must not leak proj_b into proj_a"
+    for s in stale_b:
+        assert s["name"] != "func_a1", "Staleness must not leak proj_a into proj_b"
+
+    # find_complexity_hotspots
+    complex_a = find_complexity_hotspots(conn, proj_a_id, 1)
+    complex_b = find_complexity_hotspots(conn, proj_b_id, 1)
+    for c in complex_a:
+        assert c["name"] != "func_b1", "Complexity must not leak proj_b into proj_a"
+    for c in complex_b:
+        assert c["name"] != "func_a1", "Complexity must not leak proj_a into proj_b"
+
+
 def test_specialist_update_data_excludes_stale(conn):
     """generate_specialist_update_data only counts chunks with matching last_seen_cycle."""
     pid = create_project(conn, "stats-filter-test", "/tmp/stats-filter-test")

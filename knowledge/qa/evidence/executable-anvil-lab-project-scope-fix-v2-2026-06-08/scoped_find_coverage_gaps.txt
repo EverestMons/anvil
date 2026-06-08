@@ -1,0 +1,17 @@
+127:        "AND cc.project_id = ? "
+128-        "ORDER BY hs.composite_score DESC",
+129-        (cycle_id, COVERAGE_GAP_THRESHOLD, HIGH_RISK_THRESHOLD, project_id),
+130-    )
+131-    results = []
+--
+157:        "AND cc.project_id = ? "
+158-        "ORDER BY hs.coupling_score DESC",
+159-        (cycle_id, min_threshold, project_id),
+160-    )
+161-    results = []
+--
+225:        "AND cc.project_id = ? "
+226-        "ORDER BY hs.staleness_score DESC",
+227-        (cycle_id, STALENESS_THRESHOLD, project_id),
+228-    )
+--- find_coverage_gaps (line 127): AND cc.project_id = ? PRESENT ---
