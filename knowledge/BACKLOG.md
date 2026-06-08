@@ -6,6 +6,20 @@ Lightweight capture of mid-session observations and deferred work. Each entry is
 
 ## Open
 
+### 2026-06-08 — Enforce project_id scoping invariant on health_scores-joining finding queries
+
+**Context:** Bellows cycle 1 (first multi-project run) leaked invoice-pulse chunks into bellows findings — `find_coverage_gaps` and `find_coupling_hotspots` filtered on `cycle_id` alone, and `cycle_id` is per-project (not globally unique, `cycle.py` `MAX(cycle_number WHERE project_id)+1`), so cycle N collides across projects sharing it. Fixed in `executable-anvil-lab-project-scope-fix-v2-2026-06-08` (commit `ff00ab8`): added `cc.project_id = ?` to both; regression test `test_finding_functions_project_scoped` added; validated by cycle 2 (commit `7e70af9` — 0 coverage gaps for bellows, 47 would-be-leaked rows all project_id=1). The SA audit confirmed the other 9 query surfaces already scoped.
+
+**Residual (Low):** the root — `cycle_id` is not globally unique — remains; the fix defangs it by requiring `project_id` everywhere. No automated guard prevents a *future* finding query from joining `health_scores` on `cycle_id` without a `project_id` constraint. **Fix when picked up:** a lint/test asserting every `health_scores`-joining query in `lab.py` also constrains `code_chunks.project_id`. Priority: Low (regression test covers the two current offenders; this guards new ones).
+
+### 2026-06-08 — Scan files_total inflation: non-source dirs walked
+
+Cycle 2 scan reported `files_total=3088` for bellows, a 42-`.py` repo. `.bellows-worktrees`/`.bellows-cache` are now excluded (commit `4f65e8d`) but `logs/`, `knowledge/`, `.pytest_cache`, `.claude` are still walked and registered in `files` (only `.py` are extracted, so findings are unaffected — purely metric inflation). **Fix when picked up:** exclude non-source dirs from SCAN discovery, or restrict registration to extractable extensions. Priority: Low.
+
+### 2026-06-08 — Mono-role `utility` classification for non-invoice-pulse projects
+
+Both bellows cycles classified all 155 chunks as `utility` — the role taxonomy/weights are invoice-pulse-derived, so bellows roles (watcher/dispatcher/gate/verdict-lifecycle) aren't recognized and composites are effectively role-blind for bellows. Structural findings (coverage/coupling/clone/staleness/complexity/co-change) are sound; role-weighted prioritization is not. **Fix only if bellows becomes a recurring target:** add bellows role definitions + a `PROJECT_BRIEF.md`/`domain-glossary.md` (the latter also activates the intent layer). Priority: Low (deferred — exploratory target only). Note: bellows cycle 1's coverage gaps were contaminated (pre-fix); cycle 2 is the valid baseline.
+
 ### 2026-06-05 — (d2) volatility floor is not persisted; cycle 18–19 QA floor-invariant check was wrong-layer and never evaluated
 
 Surfaced during the cycle-plan-template review (BACKLOG 2026-06-02, closed). The (d2) floor (`scorer.py:332`: `if coverage >= 0.99: volatility = max(volatility, ZERO_COVERAGE_VOLATILITY_FLOOR)`, floor=0.5) is applied as a **local variable inside `compute_composite`** and fed to the weighted composite — but the raised value is **never written back to `health_scores.volatility_score`**. The persisted column keeps the raw percentile-normalized volatility.
