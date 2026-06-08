@@ -1,0 +1,38 @@
+=== TOP-10 BY COMPOSITE — ALL EXIST IN BELLOWS SOURCE ===
+(Extracted from DEV log: knowledge/development/bellows-cycle-2-run-2026-06-08.md)
+
+| # | Function | File | Composite | Status |
+|---|---|---|---|---|
+| 1 | run_plan | bellows.py | 0.720 | EXISTS (line 341) |
+| 2 | _consume_verdicts | bellows.py | 0.665 | EXISTS (line 1269) |
+| 3 | _teardown_worktree | bellows.py | 0.608 | EXISTS (line 880) |
+| 4 | _log | bellows.py | 0.606 | EXISTS (line 44) |
+| 5 | _create_worktree | bellows.py | 0.599 | EXISTS (line 770) |
+| 6 | start | bellows.py | 0.593 | EXISTS (line 1508) |
+| 7 | _gate_rule_22_verification | gates.py | 0.582 | EXISTS (line 511) |
+| 8 | slug_for | bellows.py | 0.558 | EXISTS (line 71) |
+| 9 | Bellows | bellows.py | 0.540 | EXISTS (line 1159) |
+| 10 | _flush_buffer | notifier.py | 0.539 | EXISTS (line 103) |
+
+ALL 10 EXIST in bellows source. ZERO MISSING. ZERO invoice-pulse.
+Inverse of cycle 1 where all 10 were MISSING / invoice-pulse.
+
+=== COVERAGE-GAP PROJECT SCOPING — ZERO NON-BELLOWS ROWS ===
+
+DEV's query (reproducing find_coverage_gaps logic):
+
+SELECT cc.id, cc.project_id, cc.name, cc.file_path, hs.coverage_score, hs.composite_score
+FROM health_scores hs
+JOIN code_chunks cc ON hs.chunk_id = cc.id
+WHERE hs.cycle_id = 2 AND hs.coverage_score >= 0.8
+AND hs.composite_score >= 0.7 AND cc.chunk_type != 'test_case'
+AND cc.file_path NOT LIKE 'tests/%'
+AND cc.project_id = 2
+ORDER BY hs.composite_score DESC
+
+Result: 0 coverage gaps for bellows (project_id=2, cycle_id=2).
+
+Cross-check WITHOUT project_id filter: 47 rows returned, ALL project_id=1 (invoice-pulse). ZERO bellows rows.
+Coupling hotspots (also fixed): 7 rows, ALL project_id=2. ZERO non-bellows rows.
+
+ZERO non-bellows rows in either fixed function. FIX VALIDATED.
