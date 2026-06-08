@@ -11,6 +11,7 @@ ANVIL_DB_PATH = os.path.join(ANVIL_ROOT, "anvil.db")
 
 SCAN_TARGETS = {
     "invoice-pulse": "/Users/marklehn/Developer/GitHub/invoice-pulse",
+    "bellows": "/Users/marklehn/Developer/GitHub/bellows",
 }
 
 EXCLUDED_DIRS = {
@@ -131,4 +132,5 @@ ROLE_THRESHOLDS = {
 # Dev log paths for provenance ingestion
 DEV_LOG_PATHS = {
     "invoice-pulse": "/Users/marklehn/Developer/GitHub/invoice-pulse/knowledge/development/",
+    "bellows": "/Users/marklehn/Developer/GitHub/bellows/knowledge/development/",
 }
