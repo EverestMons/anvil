@@ -6,4 +6,29 @@ Baseline (SA blueprint, pre-BP2):
 After BP2 (QA run, read-only against live DB):
   cycle=20 rows=3688 hash=ed9cd2993d394b26b69c66e4c678727970eeea1038c9fd4de06c605ed0334bae
 
-RESULT: MATCH — byte-identical regression confirmed.
+Real recompute, post-disk-free (classify+score replay on DB copy):
+  cycle=20 rows=3688 hash=be4e109cb99fdb65d99d5d021ed4c700476f8bd83a0866d31d6f10844dad5820
+
+RESULT: MISMATCH on full hash (composite_score drift)
+
+Root-cause analysis:
+  - functional_role diffs:   0 / 3688 — classification is BYTE-IDENTICAL
+  - composite_score diffs: 1949 / 3688 — scoring differs
+  - Dimension breakdown:
+      volatility:  996 diffs (time-dependent: compute_volatility uses datetime.now() with 4-week decay window)
+      coverage:      1 diff  (rounding edge case)
+      complexity:    0 diffs
+      coupling:   1531 diffs (percentile normalization shifted by volatility set change)
+      staleness:     0 diffs
+  - Classify-only hash (file_path, name, functional_role):
+      original:    59cc0d80781ef03d8b8633c1bf605f578e9143be2503a221b5d39e449ba33078
+      recomputed:  59cc0d80781ef03d8b8633c1bf605f578e9143be2503a221b5d39e449ba33078
+      MATCH — archetype rules produce identical role assignments
+
+Verdict:
+  The full-hash MISMATCH is NOT a BP2 regression. It is caused by the scorer's
+  time-dependent volatility calculation (datetime.now() decay window). The BP2
+  archetype code changes are behavior-preserving: classification is byte-identical
+  (0/3688 diffs) and scoring weight lookup is structurally equivalent (weights
+  moved 1:1 from config globals to archetype). The composite_score drift is
+  inherent to any recompute performed at a different time than the original.

@@ -1,0 +1,155 @@
+Migration Data Equality Audit — BP2 Archetype Transcription Verification
+========================================================================
+Date: 2026-06-09
+Auditor: Anvil QA Analyst
+Baseline commit: 35ee30f (pre-BP2, last commit before archetype migration)
+HEAD commit: 5f41784 (post-BP2, archetype pattern + flask_service)
+Method: Direct source equality against git history. No recompute.
+
+Purpose:
+  The composite-hash regression gate is non-deterministic on recompute
+  (scorer.compute_volatility uses datetime.now()). Classification is already
+  proven byte-identical (0/3688 diffs). This audit verifies that the 1:1
+  data migration from module globals into flask_service.py ArchetypeDefinition
+  contains zero transcription errors.
+
+========================================================================
+GATE-CRITICAL
+========================================================================
+
+GATE 1 — ROLE_SCORING_WEIGHTS (35ee30f:src/config.py) vs flask_service.scoring_weights
+  Result: PASS
+  Keys: pre=8, archetype=8 (identical key sets)
+  Method: Exact dict equality (==) on every role's 5-dimension weight dict
+  Detail:
+    route_handler:          {vol:0.20, cov:0.30, comp:0.25, coup:0.15, stale:0.10} == MATCH
+    validation_gate:        {vol:0.15, cov:0.35, comp:0.10, coup:0.15, stale:0.25} == MATCH
+    confidence_engine:      {vol:0.20, cov:0.25, comp:0.15, coup:0.20, stale:0.20} == MATCH
+    data_model:             {vol:0.30, cov:0.20, comp:0.10, coup:0.25, stale:0.15} == MATCH
+    utility:                {vol:0.20, cov:0.20, comp:0.30, coup:0.15, stale:0.15} == MATCH
+    ingestion_orchestrator: {vol:0.20, cov:0.25, comp:0.20, coup:0.20, stale:0.15} == MATCH
+    action_router:          {vol:0.20, cov:0.30, comp:0.20, coup:0.15, stale:0.15} == MATCH
+    report_generator:       {vol:0.15, cov:0.20, comp:0.25, coup:0.15, stale:0.25} == MATCH
+  Diffs: 0
+
+GATE 2 — scorer.py dimension formulas + composite weighting
+  Result: PASS
+  Method: git diff 35ee30f HEAD -- src/scorer.py (7 added, 4 removed lines total)
+  Changed lines (exhaustive):
+    1. Import: +ArchetypeDefinition, -ROLE_SCORING_WEIGHTS
+    2. Signature: score_project(...) -> score_project(..., archetype=None)
+    3. Weight lookup:
+       OLD: weights = ROLE_SCORING_WEIGHTS.get(role, SCORING_WEIGHTS)
+       NEW: role_weights = archetype.scoring_weights if archetype else {}
+            weights = role_weights.get(role, SCORING_WEIGHTS)
+       Note: Fallback to SCORING_WEIGHTS (global default) is IDENTICAL.
+    4. SCAN_TARGETS.get(project_name) -> .get(project_name, {}).get("path")
+       (Dict format change, unrelated to scoring math)
+  Dimension functions with ZERO changes (not in any +/- diff line):
+    - compute_volatility:  UNCHANGED
+    - compute_coverage:    UNCHANGED
+    - compute_complexity:  UNCHANGED
+    - compute_coupling:    UNCHANGED
+    - compute_staleness:   UNCHANGED
+    - compute_composite:   UNCHANGED (appeared as context line only — verified)
+  Diffs to scoring math: 0
+
+========================================================================
+COMPLETENESS (non-gating, reported for full coverage)
+========================================================================
+
+GATE 3 — ROLE_THRESHOLDS (35ee30f:src/config.py) vs flask_service.role_thresholds
+  Result: PASS
+  Keys: pre=5, archetype=5 (identical key sets)
+  Method: Exact dict equality on every role's threshold dict
+  Detail:
+    route_handler:     {complexity: 0.60, coupling_hotspot: 0.80} == MATCH
+    validation_gate:   {complexity: 0.95, coupling_hotspot: 0.80} == MATCH
+    confidence_engine: {complexity: 0.85, coupling_hotspot: 0.70} == MATCH
+    data_model:        {complexity: 0.90, coupling_hotspot: 0.90} == MATCH
+    utility:           {complexity: 0.50, coupling_hotspot: 0.80} == MATCH
+  Diffs: 0
+
+GATE 4a — FUNCTIONAL_ROLE_SEEDS (35ee30f:src/db.py:589-620) vs flask_service.roles
+  Result: PASS
+  Count: pre=25, archetype=25
+  Method: Exact list equality (==) preserving order, tuple content (name, description, parent_role)
+  Groups verified: Web Layer (3), Validation Pipeline (5), Intelligence Layer (5),
+                   Data Layer (6), Infrastructure (6)
+  Diffs: 0
+
+GATE 4b — BEST_PRACTICE_SEEDS (35ee30f:src/db.py:673-739) vs flask_service.best_practices
+  Result: PASS
+  Count: pre=15, archetype=15
+  Method: Exact list equality (==) preserving order, tuple content
+          (role, pattern_name, description, detection_hint, source, severity)
+  Diffs: 0
+
+GATE 5a — CONTENT_CHECKS (35ee30f:src/detector.py:15-54) vs flask_service.content_checks
+  Result: PASS
+  Pattern groups: pre=8, archetype=8
+  Total regex patterns: pre=10, archetype=10
+  Method: Compared regex .pattern string, .flags int, and message string for each
+  Diffs: 0
+
+GATE 5b — STRUCTURAL_CHECKS (35ee30f:src/detector.py:58-63) vs flask_service.structural_checks
+  Result: PASS
+  Pattern groups: pre=1, archetype=1
+  Method: Compared field, threshold, direction, and message for each
+  Diffs: 0
+
+========================================================================
+BONUS — Classification rules (already proven by classify-only hash, verified at source)
+========================================================================
+
+DECORATOR_RULES (35ee30f:src/classifier.py:18-23 vs flask_service.decorator_rules):
+  PASS — 4 rules, exact pattern+role equality
+
+NAME_RULES (35ee30f:src/classifier.py:25-51 vs flask_service.name_rules):
+  PASS — 25 rules, exact pattern+role equality (order preserved)
+
+FILE_PATH_RULES (35ee30f:src/classifier.py:54-85 vs flask_service.file_path_rules):
+  PASS — 30 rules, exact pattern+role equality (order preserved)
+
+========================================================================
+SUMMARY
+========================================================================
+
+  Gate-critical (G1, G2):           PASS — zero diffs
+  Completeness (G3, G4a/b, G5a/b): PASS — zero diffs
+  Bonus (classification rules):     PASS — zero diffs
+
+  OVERALL: PASS — all data structures migrated byte-identical from
+  pre-BP2 module globals to flask_service ArchetypeDefinition.
+  No transcription errors detected.
+
+========================================================================
+Output Receipt
+========================================================================
+Agent: Anvil QA Analyst
+Step: Migration data equality audit (manual re-verification)
+Status: Complete
+
+What Was Done:
+  Compared every data structure migrated in BP2 (scoring weights, thresholds,
+  roles, best practices, content checks, structural checks, classification rules)
+  directly against git commit 35ee30f source — not by recompute. Used exact
+  Python equality (==) on dict/list/tuple structures with regex pattern+flags
+  normalization for compiled regex objects. Verified scorer.py diff is limited
+  to weight-lookup indirection with zero changes to dimension formulas or
+  composite computation.
+
+Files Deposited:
+  - knowledge/qa/evidence/anvil-archetype-flask-service-migration-2026-06-09/migration_data_equality.txt
+
+Files Modified (Code):
+  - None
+
+Decisions Made:
+  - Gate 2 initial false positive on compute_composite resolved by verifying
+    it appeared only as a diff context line, not a changed line
+  - Regex comparison used .pattern and .flags attributes since compiled
+    re.Pattern objects cannot be compared with ==
+
+Flags for CEO:
+  - None
