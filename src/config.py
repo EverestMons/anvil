@@ -18,7 +18,7 @@ SCAN_TARGETS = {
     "bellows": {
         "path": "/Users/marklehn/Developer/GitHub/bellows",
         "language": "python",
-        "archetype": "flask_service",
+        "archetype": "daemon",
     },
 }
 
