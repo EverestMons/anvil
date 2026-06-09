@@ -11,8 +11,17 @@ from src.db import (
     create_best_practice, get_best_practices_by_role,
 )
 from src.scorer import compute_composite
-from src.config import SCORING_WEIGHTS, ROLE_SCORING_WEIGHTS, ROLE_THRESHOLDS
+from src.config import SCORING_WEIGHTS
+from src.classifier_registry import get_archetype
+from src.cycle import seed_archetype_data
 from src.lab import research_best_practices
+
+# Ensure archetypes are registered
+import src.archetypes  # noqa: F401
+
+_archetype = get_archetype("flask_service")
+ROLE_SCORING_WEIGHTS = _archetype.scoring_weights
+ROLE_THRESHOLDS = _archetype.role_thresholds
 
 
 @pytest.fixture
@@ -20,6 +29,8 @@ def conn():
     c = sqlite3.connect(":memory:")
     init_db(c)
     c.execute("PRAGMA foreign_keys=ON")
+    # Seed roles + best practices from archetype
+    seed_archetype_data(c, _archetype)
     yield c
     c.close()
 

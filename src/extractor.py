@@ -39,7 +39,7 @@ def extract_project(conn, project_name: str, cycle_id: int) -> dict:
         raise ValueError(f"Project not found: {project_name}")
 
     project_id = project["id"]
-    project_path = SCAN_TARGETS.get(project_name)
+    project_path = SCAN_TARGETS.get(project_name, {}).get("path")
     if project_path is None:
         raise ValueError(f"No scan target for project: {project_name}")
 

@@ -35,7 +35,7 @@ def scan_project(conn, project_name: str) -> dict:
     if project_name not in SCAN_TARGETS:
         raise ValueError(f"Unknown project: {project_name}")
 
-    project_path = SCAN_TARGETS[project_name]
+    project_path = SCAN_TARGETS[project_name]["path"]
     if not os.path.isdir(project_path):
         raise FileNotFoundError(f"Project path does not exist: {project_path}")
 

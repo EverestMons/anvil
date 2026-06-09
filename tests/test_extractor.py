@@ -74,7 +74,9 @@ def mock_project(tmp_path, conn, monkeypatch):
     """))
 
     # Register in SCAN_TARGETS
-    monkeypatch.setitem(SCAN_TARGETS, "mock-project", str(tmp_path))
+    monkeypatch.setitem(SCAN_TARGETS, "mock-project", {
+        "path": str(tmp_path), "language": "python", "archetype": "flask_service",
+    })
 
     # Create project and module chunks (simulating scanner output)
     pid = create_project(conn, "mock-project", str(tmp_path))

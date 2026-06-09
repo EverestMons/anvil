@@ -11,12 +11,34 @@ from datetime import datetime, timezone
 
 from src import db
 from src.classifier import classify_project
-from src.config import DEV_LOG_PATHS
+from src.classifier_registry import get_archetype
+from src.config import DEV_LOG_PATHS, SCAN_TARGETS
 from src.scanner import scan_project
 from src.extractor import extract_project
 from src.provenance import ingest_provenance
 from src.scorer import score_project
 from src.lab import run_lab
+
+# Ensure archetypes are registered
+import src.archetypes  # noqa: F401
+
+
+def seed_archetype_data(conn, archetype) -> None:
+    """Seed functional_roles and best_practices from archetype (idempotent)."""
+    for name, description, parent_role in archetype.roles:
+        conn.execute(
+            "INSERT OR IGNORE INTO functional_roles (name, description, parent_role) "
+            "VALUES (?, ?, ?)",
+            (name, description, parent_role),
+        )
+    for role, pattern, desc, hint, source, severity in archetype.best_practices:
+        conn.execute(
+            "INSERT OR IGNORE INTO best_practices "
+            "(functional_role, pattern_name, description, detection_hint, source, severity) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (role, pattern, desc, hint, source, severity),
+        )
+    conn.commit()
 
 
 def run_cycle(conn, project_name: str) -> dict:
@@ -38,6 +60,14 @@ def run_cycle(conn, project_name: str) -> dict:
     cycle_id = (row[0] or 0) + 1
 
     results = {"cycle_id": cycle_id, "project_name": project_name}
+
+    # Load and seed archetype
+    target = SCAN_TARGETS.get(project_name, {})
+    archetype_name = target.get("archetype") if isinstance(target, dict) else None
+    archetype = None
+    if archetype_name:
+        archetype = get_archetype(archetype_name)
+        seed_archetype_data(conn, archetype)
 
     # Stage 1: SCAN
     try:
@@ -78,7 +108,7 @@ def run_cycle(conn, project_name: str) -> dict:
 
     # Stage 3: SCORE
     try:
-        score_result = score_project(conn, project_name, cycle_id)
+        score_result = score_project(conn, project_name, cycle_id, archetype)
         results["score"] = score_result
     except Exception as e:
         results["score"] = {"error": str(e)}

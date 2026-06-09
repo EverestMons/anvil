@@ -267,8 +267,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     # Migration: relax chunk_type CHECK constraint (allow any string)
     _migrate_chunk_type_constraint(conn)
 
-    _seed_functional_roles(conn)
-    _seed_best_practices(conn)
+    # Migration: add archetype column to functional_roles if not present
+    try:
+        conn.execute("ALTER TABLE functional_roles ADD COLUMN archetype TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
 
 def _migrate_chunk_type_constraint(conn: sqlite3.Connection) -> None:
@@ -586,51 +590,6 @@ def get_cycle_report(conn: sqlite3.Connection, cycle_number: int) -> Optional[di
 
 # --- functional_roles ---
 
-FUNCTIONAL_ROLE_SEEDS = [
-    # Web Layer
-    ("route_handler", "Flask blueprint route functions handling HTTP requests", "web_layer"),
-    ("report_generator", "Analytics dashboards and Excel export routes", "web_layer"),
-    ("document_manager", "Contract document hierarchy CRUD routes", "web_layer"),
-    # Validation Pipeline
-    ("validation_gate", "Sequential invoice validation gates returning GateResult", "validation_pipeline"),
-    ("validation_orchestrator", "Runs gates in sequence and aggregates results", "validation_pipeline"),
-    ("batch_validator", "Concurrent multi-invoice validation with caching", "validation_pipeline"),
-    ("action_router", "Maps validation failures to action queue items", "validation_pipeline"),
-    ("content_generator", "Text generation for dispute emails and tickets", "validation_pipeline"),
-    # Intelligence Layer
-    ("confidence_engine", "State machine for contract element confidence lifecycle", "intelligence_layer"),
-    ("anomaly_detector", "Drift detection between paid data and contract terms", "intelligence_layer"),
-    ("pattern_learner", "Discovers new contract terms from paid invoice patterns", "intelligence_layer"),
-    ("circuit_breaker", "Contradiction spike detection to prevent feedback loops", "intelligence_layer"),
-    ("exit_interviewer", "PRO resolution capture and pattern logging", "intelligence_layer"),
-    # Data Layer
-    ("ingestion_orchestrator", "Full CSV/XML ingestion pipeline orchestration", "data_layer"),
-    ("data_parser", "XML/CSV parsing and format conversion", "data_layer"),
-    ("data_model", "SQLite schema definitions and migrations", "data_layer"),
-    ("lifecycle_tracker", "Invoice status transition detection and logging", "data_layer"),
-    ("entity_matcher", "Carrier identity detection via fuzzy matching", "data_layer"),
-    ("address_normalizer", "Bill-to normalization and fuzzy matching", "data_layer"),
-    # Infrastructure
-    ("pipeline_orchestrator", "Daily execution sequence coordinator", "infrastructure"),
-    ("data_guardian", "Backup and integrity verification", "infrastructure"),
-    ("email_processor", "PST import and email-to-invoice matching", "infrastructure"),
-    ("configuration", "Centralized settings and constants", "infrastructure"),
-    ("audit_logger", "Append-only event logging", "infrastructure"),
-    ("utility", "Generic helpers with no domain logic", "infrastructure"),
-]
-
-
-def _seed_functional_roles(conn: sqlite3.Connection) -> None:
-    """Seed functional_roles table with the 25-role taxonomy."""
-    for name, description, parent_role in FUNCTIONAL_ROLE_SEEDS:
-        conn.execute(
-            "INSERT OR IGNORE INTO functional_roles (name, description, parent_role) "
-            "VALUES (?, ?, ?)",
-            (name, description, parent_role),
-        )
-    conn.commit()
-
-
 def get_functional_roles(conn: sqlite3.Connection) -> list[dict]:
     """Retrieve all functional roles."""
     conn.row_factory = _row_to_dict
@@ -669,87 +628,6 @@ def get_provenance_by_chunk(conn: sqlite3.Connection,
 
 
 # --- best_practices ---
-
-BEST_PRACTICE_SEEDS = [
-    # route_handler
-    ("route_handler", "single_responsibility",
-     "Each route function handles one concern without multi-step orchestration inline",
-     "Function length > 80 lines or multiple DB write operations in one route",
-     "curated", "medium"),
-    ("route_handler", "input_validation_at_boundary",
-     "All form/query params validated before DB operations with type coercion",
-     "Missing type coercion on request.form values; raw request.form[] access",
-     "curated", "high"),
-    ("route_handler", "consistent_error_handling",
-     "Flash messages for user errors, proper HTTP status codes, no bare except clauses",
-     "Bare except: blocks; missing flash() on validation failure; 200 status on error",
-     "curated", "medium"),
-    # confidence_engine
-    ("confidence_engine", "immutable_state_transitions",
-     "All state transitions go through ALLOWED_TRANSITIONS check; no direct state assignment",
-     "State column UPDATE without calling transition validation function",
-     "curated", "high"),
-    ("confidence_engine", "append_only_audit",
-     "Every state change writes to confidence_log; no updates or deletes on log table",
-     "UPDATE or DELETE on confidence_log table; missing log entry after state change",
-     "curated", "high"),
-    ("confidence_engine", "threshold_gated_automation",
-     "Automated actions require minimum invoice count threshold before triggering",
-     "Automation logic without checking min_invoices or sample_size threshold",
-     "curated", "high"),
-    # validation_gate
-    ("validation_gate", "structured_return_type",
-     "Every gate returns a GateResult dataclass with pass/fail, reason, and enrichment data",
-     "Functions returning bool, tuple, or dict instead of GateResult",
-     "curated", "high"),
-    ("validation_gate", "error_accumulation",
-     "Gates collect all failures within scope rather than short-circuiting on first error",
-     "Early return on first failure within a single gate function",
-     "curated", "medium"),
-    ("validation_gate", "deterministic_output",
-     "Same inputs produce same GateResult; no external API calls or datetime in comparisons",
-     "External HTTP calls; datetime.now() used in value comparison; random module usage",
-     "curated", "medium"),
-    # utility
-    ("utility", "pure_functions",
-     "No side effects, no DB access, no file I/O; pure data transformation only",
-     "Functions with conn parameter; file open() calls; global state mutation",
-     "curated", "medium"),
-    ("utility", "explicit_null_handling",
-     "Return typed defaults rather than None; document nullable return values with type hints",
-     "Bare return None without Optional type hint; undocumented None returns",
-     "curated", "low"),
-    ("utility", "no_domain_logic",
-     "Helpers should be domain-agnostic; domain-specific logic belongs in its role module",
-     "References to invoice, contract, carrier, or validation in utility functions",
-     "curated", "medium"),
-    # data_model
-    ("data_model", "idempotent_schema",
-     "All CREATE TABLE use IF NOT EXISTS; ALTER TABLE wrapped in try/except",
-     "Missing IF NOT EXISTS; bare ALTER TABLE without error handling",
-     "curated", "high"),
-    ("data_model", "foreign_key_enforcement",
-     "All cross-table references use REFERENCES with explicit ON DELETE policy",
-     "Integer columns referencing other tables without FK constraint",
-     "curated", "medium"),
-    ("data_model", "migration_isolation",
-     "Each migration in its own function with clear naming (_migrate_X_schema)",
-     "Multiple unrelated ALTER TABLE in one function; unnamed migration logic",
-     "curated", "medium"),
-]
-
-
-def _seed_best_practices(conn: sqlite3.Connection) -> None:
-    """Seed best_practices table with 15 initial patterns."""
-    for role, pattern, desc, hint, source, severity in BEST_PRACTICE_SEEDS:
-        conn.execute(
-            "INSERT OR IGNORE INTO best_practices "
-            "(functional_role, pattern_name, description, detection_hint, source, severity) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (role, pattern, desc, hint, source, severity),
-        )
-    conn.commit()
-
 
 def create_best_practice(conn: sqlite3.Connection, functional_role: str,
                          pattern_name: str, description: str,

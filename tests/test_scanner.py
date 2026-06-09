@@ -307,7 +307,7 @@ def test_scan_project_summary_keys(conn, temp_project, monkeypatch):
     monkeypatch.setitem(
         __import__("src.config", fromlist=["SCAN_TARGETS"]).SCAN_TARGETS,
         "test-proj",
-        str(temp_project),
+        {"path": str(temp_project), "language": "python", "archetype": "flask_service"},
     )
     summary = scan_project(conn, "test-proj")
     assert set(summary.keys()) == {
@@ -325,7 +325,7 @@ def test_scan_project_idempotent(conn, temp_project, monkeypatch):
     monkeypatch.setitem(
         __import__("src.config", fromlist=["SCAN_TARGETS"]).SCAN_TARGETS,
         "test-proj",
-        str(temp_project),
+        {"path": str(temp_project), "language": "python", "archetype": "flask_service"},
     )
     s1 = scan_project(conn, "test-proj")
     s2 = scan_project(conn, "test-proj")
@@ -338,7 +338,7 @@ def test_scan_project_updates_last_scanned(conn, temp_project, monkeypatch):
     monkeypatch.setitem(
         __import__("src.config", fromlist=["SCAN_TARGETS"]).SCAN_TARGETS,
         "test-proj",
-        str(temp_project),
+        {"path": str(temp_project), "language": "python", "archetype": "flask_service"},
     )
     scan_project(conn, "test-proj")
     cur = conn.execute("SELECT last_scanned FROM projects WHERE name = 'test-proj'")

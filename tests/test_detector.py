@@ -12,6 +12,15 @@ from src.db import (
 )
 from src.detector import check_best_practice
 from src.lab import find_best_practice_deviations
+from src.classifier_registry import get_archetype
+from src.cycle import seed_archetype_data
+
+# Ensure archetypes are registered
+import src.archetypes  # noqa: F401
+
+_archetype = get_archetype("flask_service")
+_content_checks = _archetype.content_checks
+_structural_checks = _archetype.structural_checks
 
 
 @pytest.fixture
@@ -19,6 +28,8 @@ def conn():
     c = sqlite3.connect(":memory:")
     init_db(c)
     c.execute("PRAGMA foreign_keys=ON")
+    # Seed best practices for deviation finder tests
+    seed_archetype_data(c, _archetype)
     yield c
     c.close()
 
@@ -31,7 +42,7 @@ def test_bare_except_detected():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "consistent_error_handling"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is False
     assert "Bare except" in result["observation"]
 
@@ -42,7 +53,7 @@ def test_specific_except_compliant():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "consistent_error_handling"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is True
 
 
@@ -52,7 +63,7 @@ def test_raw_form_access_detected():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "input_validation_at_boundary"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is False
     assert "request.form[]" in result["observation"]
 
@@ -63,7 +74,7 @@ def test_form_get_compliant():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "input_validation_at_boundary"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is True
 
 
@@ -73,7 +84,7 @@ def test_conn_in_utility_detected():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "pure_functions"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is False
     assert "connection" in result["observation"].lower() or "conn" in result["observation"].lower()
 
@@ -84,7 +95,7 @@ def test_pure_utility_compliant():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "pure_functions"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is True
 
 
@@ -94,7 +105,7 @@ def test_domain_logic_in_utility_detected():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "no_domain_logic"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is False
     assert "Domain-specific" in result["observation"]
 
@@ -105,7 +116,7 @@ def test_datetime_in_gate_detected():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "deterministic_output"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is False
     assert "datetime.now()" in result["observation"]
 
@@ -116,7 +127,7 @@ def test_boolean_return_in_gate_detected():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "structured_return_type"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is False
     assert "boolean" in result["observation"].lower()
 
@@ -127,7 +138,7 @@ def test_create_table_without_if_not_exists():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "idempotent_schema"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is False
 
 
@@ -137,7 +148,7 @@ def test_create_table_with_if_not_exists_compliant():
         "structural_metadata": None,
     }
     practice = {"pattern_name": "idempotent_schema"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is True
 
 
@@ -149,7 +160,7 @@ def test_long_function_detected():
         "structural_metadata": json.dumps({"line_count": 101}),
     }
     practice = {"pattern_name": "single_responsibility"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is False
     assert "101" in result["observation"]
 
@@ -160,7 +171,7 @@ def test_short_function_compliant():
         "structural_metadata": json.dumps({"line_count": 2}),
     }
     practice = {"pattern_name": "single_responsibility"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is True
 
 
@@ -169,7 +180,7 @@ def test_short_function_compliant():
 def test_unknown_practice_compliant():
     chunk = {"content": "def x():\n    pass", "structural_metadata": None}
     practice = {"pattern_name": "unknown_future_practice"}
-    result = check_best_practice(chunk, practice)
+    result = check_best_practice(chunk, practice, _content_checks, _structural_checks)
     assert result["compliant"] is True
 
 
@@ -191,7 +202,7 @@ def test_find_deviations(conn):
     )
     conn.commit()
 
-    deviations = find_best_practice_deviations(conn, pid, 1)
+    deviations = find_best_practice_deviations(conn, pid, 1, _archetype)
     assert len(deviations) >= 1
 
     # Should find consistent_error_handling violation
@@ -223,7 +234,7 @@ def test_no_deviations_for_compliant_chunk(conn):
     )
     conn.commit()
 
-    deviations = find_best_practice_deviations(conn, pid, 1)
+    deviations = find_best_practice_deviations(conn, pid, 1, _archetype)
     # May still have some deviations from structural checks, but not error_handling
     error_devs = [d for d in deviations if d["practice_name"] == "consistent_error_handling"]
     assert len(error_devs) == 0
@@ -240,5 +251,5 @@ def test_unclassified_chunks_skipped(conn):
         content_hash="h3", start_line=1, end_line=4, last_seen_cycle=1,
     )
 
-    deviations = find_best_practice_deviations(conn, pid, 1)
+    deviations = find_best_practice_deviations(conn, pid, 1, _archetype)
     assert len(deviations) == 0

@@ -78,7 +78,9 @@ def cycle_project(tmp_path, conn, monkeypatch):
         capture_output=True,
     )
 
-    monkeypatch.setitem(SCAN_TARGETS, "cycle-test", str(tmp_path))
+    monkeypatch.setitem(SCAN_TARGETS, "cycle-test", {
+        "path": str(tmp_path), "language": "python", "archetype": "flask_service",
+    })
     return tmp_path
 
 
@@ -104,7 +106,9 @@ def test_run_cycle_end_to_end(conn, cycle_project, monkeypatch):
 
 def test_run_cycle_scanner_failure(conn, monkeypatch):
     # Unknown project should fail at scan
-    monkeypatch.setitem(SCAN_TARGETS, "bad-proj", "/nonexistent/path")
+    monkeypatch.setitem(SCAN_TARGETS, "bad-proj", {
+        "path": "/nonexistent/path", "language": "python", "archetype": "flask_service",
+    })
     result = run_cycle(conn, "bad-proj")
     assert result.get("aborted_at") == "scan"
 

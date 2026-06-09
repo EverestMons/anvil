@@ -30,6 +30,13 @@ from src.lab import (
     _is_noise_chunk,
 )
 from src.config import SCAN_TARGETS
+from src.classifier_registry import get_archetype
+from src.cycle import seed_archetype_data
+
+# Ensure archetypes are registered
+import src.archetypes  # noqa: F401
+
+_archetype = get_archetype("flask_service")
 
 
 @pytest.fixture
@@ -37,6 +44,8 @@ def conn():
     c = sqlite3.connect(":memory:")
     init_db(c)
     c.execute("PRAGMA foreign_keys=ON")
+    # Seed roles + best practices from archetype
+    seed_archetype_data(c, _archetype)
     yield c
     c.close()
 
@@ -310,7 +319,9 @@ def test_write_vs_record_path_split(conn, lab_project, tmp_path):
 # --- run_lab end-to-end ---
 
 def test_run_lab_end_to_end(conn, lab_project, tmp_path, monkeypatch):
-    monkeypatch.setitem(SCAN_TARGETS, "lab-test", "/tmp/lab-test")
+    monkeypatch.setitem(SCAN_TARGETS, "lab-test", {
+        "path": "/tmp/lab-test", "language": "python", "archetype": "flask_service",
+    })
     monkeypatch.setattr("src.lab.ANVIL_ROOT", str(tmp_path))
     monkeypatch.setattr("src.lab.ANVIL_RUNTIME_ROOT", str(tmp_path))
 
@@ -628,7 +639,7 @@ def test_best_practice_deviations_excludes_stale(conn):
         last_seen_cycle=2, functional_role="route_handler",
     )
 
-    results = find_best_practice_deviations(conn, pid, 2)
+    results = find_best_practice_deviations(conn, pid, 2, _archetype)
     names = [r["name"] for r in results]
     assert "stale_handler" not in names, "Stale chunk must be filtered out"
     # fresh_handler may or may not have deviations depending on practice rules,

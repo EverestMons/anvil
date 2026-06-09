@@ -14,6 +14,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 from src import db
+from src.classifier_registry import ArchetypeDefinition, get_archetype
 from src.config import (
     ANVIL_ROOT,
     ANVIL_RUNTIME_ROOT,
@@ -23,9 +24,12 @@ from src.config import (
     STALENESS_THRESHOLD,
     COMPLEXITY_THRESHOLD,
     COCHANGE_MIN_COUNT,
-    ROLE_THRESHOLDS,
+    SCAN_TARGETS,
 )
 from src.detector import check_best_practice
+
+# Ensure archetypes are registered
+import src.archetypes  # noqa: F401
 
 _SESSION_LIFECYCLE_NAMES = frozenset({"execute", "commit", "close", "rollback", "begin"})
 _SESSION_LIFECYCLE_PATH_HINTS = ("profile_ingestion", "database", "_session", "_engine", "session_manager")
@@ -58,13 +62,19 @@ def run_lab(conn, project_name: str, cycle_id: int) -> dict:
     project_id = project["id"]
     started_at = datetime.now(timezone.utc).isoformat()
 
+    # Load archetype for role thresholds and best practice checks
+    target = SCAN_TARGETS.get(project_name, {})
+    archetype_name = target.get("archetype") if isinstance(target, dict) else None
+    archetype = get_archetype(archetype_name) if archetype_name else None
+    role_thresholds = archetype.role_thresholds if archetype else {}
+
     coverage_gaps = find_coverage_gaps(conn, project_id, cycle_id)
-    coupling_hotspots = find_coupling_hotspots(conn, project_id, cycle_id)
+    coupling_hotspots = find_coupling_hotspots(conn, project_id, cycle_id, role_thresholds)
     clone_candidates = find_clone_candidates(conn, project_id, cycle_id)
     staleness_alerts = find_staleness_alerts(conn, project_id, cycle_id)
-    complexity_hotspots = find_complexity_hotspots(conn, project_id, cycle_id)
+    complexity_hotspots = find_complexity_hotspots(conn, project_id, cycle_id, role_thresholds)
     cochange_patterns = find_cochange_patterns(conn, project_id)
-    bp_deviations = find_best_practice_deviations(conn, project_id, cycle_id)
+    bp_deviations = find_best_practice_deviations(conn, project_id, cycle_id, archetype)
 
     # Phase 2.1 — Intent gaps
     project_path = project.get("path", "")
@@ -140,11 +150,14 @@ def find_coverage_gaps(conn, project_id: int, cycle_id: int) -> list[dict]:
     return results
 
 
-def find_coupling_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
+def find_coupling_hotspots(conn, project_id: int, cycle_id: int,
+                           role_thresholds: dict = None) -> list[dict]:
     """Find highly coupled chunks, using role-specific thresholds."""
+    if role_thresholds is None:
+        role_thresholds = {}
     min_threshold = min(
         (rt.get("coupling_hotspot_threshold", COUPLING_HOTSPOT_THRESHOLD)
-         for rt in ROLE_THRESHOLDS.values()),
+         for rt in role_thresholds.values()),
         default=COUPLING_HOTSPOT_THRESHOLD,
     )
     cur = conn.execute(
@@ -161,7 +174,7 @@ def find_coupling_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
     results = []
     for r in cur.fetchall():
         role = r[5]
-        role_thresh = ROLE_THRESHOLDS.get(role, {})
+        role_thresh = role_thresholds.get(role, {})
         threshold = role_thresh.get(
             "coupling_hotspot_threshold", COUPLING_HOTSPOT_THRESHOLD
         )
@@ -235,12 +248,15 @@ def find_staleness_alerts(conn, project_id: int, cycle_id: int) -> list[dict]:
     ]
 
 
-def find_complexity_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]:
+def find_complexity_hotspots(conn, project_id: int, cycle_id: int,
+                             role_thresholds: dict = None) -> list[dict]:
     """Find overly complex functions, using role-specific thresholds."""
+    if role_thresholds is None:
+        role_thresholds = {}
     # Pre-filter at minimum possible threshold (0.50 for utility)
     min_threshold = min(
         (rt.get("complexity_threshold", COMPLEXITY_THRESHOLD)
-         for rt in ROLE_THRESHOLDS.values()),
+         for rt in role_thresholds.values()),
         default=COMPLEXITY_THRESHOLD,
     )
     cur = conn.execute(
@@ -257,7 +273,7 @@ def find_complexity_hotspots(conn, project_id: int, cycle_id: int) -> list[dict]
     results = []
     for r in cur.fetchall():
         role = r[6]
-        role_thresh = ROLE_THRESHOLDS.get(role, {})
+        role_thresh = role_thresholds.get(role, {})
         threshold = role_thresh.get("complexity_threshold", COMPLEXITY_THRESHOLD)
         if r[4] < threshold:
             continue
@@ -320,8 +336,12 @@ def find_cochange_patterns(conn, project_id: int) -> list[dict]:
     return results
 
 
-def find_best_practice_deviations(conn, project_id: int, cycle_id: int) -> list[dict]:
+def find_best_practice_deviations(conn, project_id: int, cycle_id: int,
+                                   archetype: ArchetypeDefinition = None) -> list[dict]:
     """Find chunks that deviate from best practices for their functional role."""
+    content_checks = archetype.content_checks if archetype else {}
+    structural_checks = archetype.structural_checks if archetype else {}
+
     # Get all classified chunks
     conn.row_factory = db._row_to_dict
     cur = conn.execute(
@@ -344,7 +364,7 @@ def find_best_practice_deviations(conn, project_id: int, cycle_id: int) -> list[
             practices_cache[role] = db.get_best_practices_by_role(conn, role)
 
         for practice in practices_cache[role]:
-            result = check_best_practice(chunk, practice)
+            result = check_best_practice(chunk, practice, content_checks, structural_checks)
             if not result["compliant"]:
                 results.append({
                     "chunk_id": chunk["id"],

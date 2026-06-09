@@ -13,8 +13,9 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from src import db
+from src.classifier_registry import ArchetypeDefinition
 from src.config import (
-    GIT_HISTORY_WEEKS, SCAN_TARGETS, SCORING_WEIGHTS, ROLE_SCORING_WEIGHTS,
+    GIT_HISTORY_WEEKS, SCAN_TARGETS, SCORING_WEIGHTS,
 )
 
 # Floor applied to volatility when computing composite for zero-coverage chunks.
@@ -24,7 +25,8 @@ from src.config import (
 ZERO_COVERAGE_VOLATILITY_FLOOR = 0.5
 
 
-def score_project(conn, project_name: str, cycle_id: int) -> dict:
+def score_project(conn, project_name: str, cycle_id: int,
+                  archetype: ArchetypeDefinition = None) -> dict:
     """
     Main entry point for scoring all chunks in a project.
 
@@ -112,7 +114,8 @@ def score_project(conn, project_name: str, cycle_id: int) -> dict:
         stale_score = entry["staleness"]
 
         role = chunk.get("functional_role")
-        weights = ROLE_SCORING_WEIGHTS.get(role, SCORING_WEIGHTS)
+        role_weights = archetype.scoring_weights if archetype else {}
+        weights = role_weights.get(role, SCORING_WEIGHTS)
 
         composite = compute_composite(
             vol_score, cov_score, comp_score, coup_score, stale_score,
@@ -353,7 +356,7 @@ def ingest_test_results(conn, project_name: str,
     if project is None:
         return {"status": "skipped", "reason": "Project not found"}
 
-    project_path = SCAN_TARGETS.get(project_name)
+    project_path = SCAN_TARGETS.get(project_name, {}).get("path")
     if not project_path:
         return {"status": "skipped", "reason": "No scan target"}
 

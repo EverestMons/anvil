@@ -22,7 +22,11 @@ from src.scorer import (
     ingest_test_results,
     _parse_pytest_output,
 )
+from src.classifier_registry import get_archetype
 from src.config import SCAN_TARGETS, SCORING_WEIGHTS
+
+# Ensure archetypes are registered
+import src.archetypes  # noqa: F401
 
 
 @pytest.fixture
@@ -308,8 +312,10 @@ def test_composite_volatility_floor_for_zero_coverage():
 
 def test_score_project_end_to_end(conn, scored_project, monkeypatch):
     pid, _, _, _ = scored_project
-    monkeypatch.setitem(SCAN_TARGETS, "test-proj", "/tmp/test")
-    result = score_project(conn, "test-proj", 1)
+    monkeypatch.setitem(SCAN_TARGETS, "test-proj", {
+        "path": "/tmp/test", "language": "python", "archetype": "flask_service",
+    })
+    result = score_project(conn, "test-proj", 1, get_archetype("flask_service"))
 
     assert result["chunks_scored"] == 3  # c1, c2, c3 (non-module)
     assert result["avg_composite"] >= 0.0
@@ -361,7 +367,9 @@ def test_parse_pytest_output_with_errors():
 
 def test_scorer_excludes_unstamped_chunks(conn, monkeypatch):
     """Scorer only scores chunks with last_seen_cycle = cycle_id."""
-    monkeypatch.setitem(SCAN_TARGETS, "scope-test", "/tmp/scope")
+    monkeypatch.setitem(SCAN_TARGETS, "scope-test", {
+        "path": "/tmp/scope", "language": "python", "archetype": "flask_service",
+    })
     pid = create_project(conn, "scope-test", "/tmp/scope")
 
     # Live chunk (stamped)
@@ -378,7 +386,7 @@ def test_scorer_excludes_unstamped_chunks(conn, monkeypatch):
         start_line=1, end_line=1, last_seen_cycle=3,
     )
 
-    result = score_project(conn, "scope-test", 5)
+    result = score_project(conn, "scope-test", 5, get_archetype("flask_service"))
     assert result["chunks_scored"] == 1
 
     # Live chunk should have a health_score for cycle 5
