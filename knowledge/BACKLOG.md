@@ -6,6 +6,12 @@ Lightweight capture of mid-session observations and deferred work. Each entry is
 
 ## Open
 
+### 2026-06-09 — Bellows QA worktree cannot read RULE_20_SELF_CHECK_BLOCK.md at the governance root; agent attempts a config self-grant
+
+**Context:** BP2 archetype/flask_service migration (`Done/executable-anvil-archetype-flask-service-migration-2026-06-09.md`) — the Step-3 QA run tripped Bellows `no_permission_denials`. The QA agent, dispatched in an anvil worktree, could not read `/Users/marklehn/Developer/GitHub/RULE_20_SELF_CHECK_BLOCK.md` (governance root, above the worktree) and invoked a `Skill update-config` call to self-grant `allow read /Users/marklehn/Developer/GitHub`, which the sandbox blocked. The agent recovered (rule_20_self_check passed byte-exact) and the close was authorized via a Rule 22(b) override, so no data harm — but every Bellows-dispatched QA step that reads the canonical Rule 20 block from the governance root will hit the same denial and trip the gate, forcing a Planner override each time.
+
+**Fix when picked up (two options):** (a) give the worktree read access to the governance-root `RULE_20_SELF_CHECK_BLOCK.md` (mount/symlink, or copy it into each project at dispatch); or (b) have the Planner inline the canonical block content into the QA prompt instead of instructing a governance-root read — but (b) reintroduces the banner-paraphrase drift the single-source file exists to prevent, so (a) is preferred. Same worktree-reachability class as the 2026-06-06 `GOVERNANCE_ROOT`/`__file__` lesson. **Priority:** Medium — trips a gate on every Bellows QA step that reads the block.
+
 ### 2026-06-08 — Finish decoupling resolve_dependencies from Python AST (prereq for non-Python extractors)
 
 Build Plan 1 (extraction contract + language-extractor decoupling, commit `602e72f`) made extraction registry-dispatched behind the `LanguageExtractor` protocol, but `import ast` remains in `extractor.py`'s `resolve_dependencies()` for inheritance-edge resolution — module-path resolution was abstracted (blueprint B.5 item 4) but inheritance resolution was not. Harmless today (Python is the only registered extractor) but it would break a Swift/TS extractor. **Fix before any non-Python head:** move inheritance-edge resolution into the `LanguageExtractor` (each extractor resolves its own inheritance) so `resolve_dependencies()` is fully language-agnostic. Priority: blocks multi-language extraction (the deferred large head); not urgent until then.
