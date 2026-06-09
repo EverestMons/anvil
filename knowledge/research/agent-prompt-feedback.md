@@ -123,3 +123,10 @@
 **Plan step:** Step 1B5 — chunk_type CHECK constraint migration.
 **What happened:** The migration creates `code_chunks_new` with a self-referencing FK (`parent_chunk_id REFERENCES code_chunks_new(id)`), then renames to `code_chunks`. SQLite preserves the FK text literally — after rename, the FK still references `code_chunks_new`, which no longer exists. Any subsequent UPDATE that triggers FK validation fails with `no such table: main.code_chunks_new`. Fixed by referencing `code_chunks(id)` in the new table definition (valid because `PRAGMA foreign_keys=OFF` during migration).
 **Recommendation:** When using the SQLite table-recreation migration pattern (create new → copy data → drop old → rename), always reference the FINAL table name in FK constraints, not the temporary name. `PRAGMA foreign_keys=OFF` prevents validation during creation, and after rename the FK points to the correct table.
+
+
+### 2026-06-09 — BP3 QA: Classify-only hash row scope mismatch
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 2 Check 1 — invoice-pulse classify-identity regression gate.
+**What happened:** Initial classify-only hash computation used `chunk_type IN ('function','method','class')` (1990 rows), which is the classifiable chunk filter, not the same scope as the BP2 regression harness. The BP2 harness joins `code_chunks` with `health_scores` (3688 rows), including module/test_case/config chunks. The classify-only hash must use the same row set as the original harness (just dropping composite_score from the hash).
+**Recommendation:** When adapting a regression harness for classify-only mode, preserve the original row scope exactly — only change which columns are hashed, not which rows are included.

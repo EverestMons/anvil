@@ -1,0 +1,21 @@
+Registry Wiring Verification
+============================
+
+Registered archetypes: ['daemon', 'flask_service']
+flask_service registered: True
+daemon registered: True
+
+get_archetype("daemon"):
+  name: daemon
+  roles: 13 (expected 13)
+  role names: ['plan_dispatcher', 'worktree_manager', 'agent_lifecycle', 'gate_checker', 'verdict_handler', 'plan_validator', 'config_loader', 'notifier', 'cache_manager', 'plan_parser', 'data_model', 'cli_script', 'utility']
+  decorator_rules: 0
+  name_rules: 33
+  file_path_rules: 12
+  scoring_weights: 8 profiles
+  role_thresholds: 6
+  best_practices: 8
+  content_checks: 3
+  structural_checks: 1
+
+RESULT: PASS — daemon has 13 roles, both archetypes registered

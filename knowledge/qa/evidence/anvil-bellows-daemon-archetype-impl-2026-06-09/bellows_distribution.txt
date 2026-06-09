@@ -1,0 +1,31 @@
+Bellows Classification Distribution (Daemon Archetype)
+======================================================
+Total classifiable chunks: 155
+Non-utility: 131/155 = 84.5%
+Threshold: >= 80% (design projects 84.5%)
+
+Role Distribution:
+  plan_dispatcher: 25 (16.1%)
+  utility: 24 (15.5%)
+  gate_checker: 21 (13.5%)
+  notifier: 19 (12.3%)
+  verdict_handler: 13 (8.4%)
+  cli_script: 12 (7.7%)
+  plan_validator: 10 (6.5%)
+  agent_lifecycle: 10 (6.5%)
+  plan_parser: 7 (4.5%)
+  worktree_manager: 6 (3.9%)
+  cache_manager: 4 (2.6%)
+  config_loader: 2 (1.3%)
+  data_model: 2 (1.3%)
+
+Invalid roles (not in daemon ROLES): 0
+
+Utility residual analysis:
+  Total utility: 24
+  All 24 utility chunks are test helpers:
+    - 22 in tests/*.py (test functions/classes)
+    - 2 in tests/conftest.py (pytest fixtures: isolate_runner_logs_dir, isolate_verdicts_dir)
+  Non-test utility: 0
+
+RESULT: PASS — 84.5% non-utility, 0 invalid roles, all utility chunks are test helpers

@@ -1,0 +1,14 @@
+Invoice-Pulse Classify-Only Hash (BP3 Regression Gate)
+======================================================
+DB copy: /tmp/anvil_bp3_regression.db
+Project: invoice-pulse (id=1)
+Latest cycle: 20
+Row set: code_chunks JOIN health_scores (same scope as BP2 harness)
+Rows hashed: 3688
+Scope: (file_path, name, functional_role) — classify-only, NO composite_score
+
+Computed hash:  59cc0d80781ef03d8b8633c1bf605f578e9143be2503a221b5d39e449ba33078
+Expected hash:  59cc0d80781ef03d8b8633c1bf605f578e9143be2503a221b5d39e449ba33078
+Match: True
+
+RESULT: PASS — classify-only hash is byte-identical to BP2 baseline

@@ -1,0 +1,16 @@
+Deliverable Verification Evidence
+=================================
+
+1. daemon.py — grep for roles/rules counts:
+   roles=13, name_rules=33, file_path_rules=12
+   
+2. __init__.py — daemon import present:
+   Line 3: import src.archetypes.daemon  # noqa: F401
+
+3. config.py — bellows archetype is daemon:
+   Line 21: "archetype": "daemon",
+
+4. get_archetype('daemon') returns definition:
+   name=daemon, roles=13
+
+All deliverables verified.

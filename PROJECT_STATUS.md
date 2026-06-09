@@ -1,7 +1,7 @@
 # Anvil — Project Status
 
 **Status:** Operational
-**Last Updated:** 2026-06-09 (archetype pattern + flask_service migration)
+**Last Updated:** 2026-06-09 (BP3: daemon archetype shipped)
 
 ---
 
@@ -10,6 +10,8 @@
 Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated against invoice-pulse. Cross-validated against specialist file facts (10/10 PASS). Findings quality assessed — coverage gaps are highest-value (81% signal), Planner integration protocol defined.
 
 ## Completed Milestones
+
+- **2026-06-09: BP3 daemon archetype shipped** — Second archetype (`daemon`) registered for bellows. 13-role taxonomy across 4 groups (orchestration, governance, configuration, infrastructure), 33 name rules + 12 file_path rules (no decorator rules), 8 scoring weight profiles, 6 role thresholds, 8 best practice rules with content/structural checks. Bellows reclassified from 100% utility (155/155) to 84.5% non-utility (131/155); 24 residual utility chunks are exclusively test helpers. Invoice-pulse classify-only hash unchanged (`59cc0d80...`, 3688 rows). 256 tests pass. Design: `knowledge/architecture/bellows-daemon-archetype-design-2026-06-09.md`. Dev log: `knowledge/development/bellows-daemon-archetype-impl-2026-06-09.md`. QA: `knowledge/qa/2026-06-09-bellows-daemon-archetype-impl-qa.md`.
 
 - **2026-06-09: Archetype pattern + flask_service migration shipped** — All project-type-specific rules (classification, scoring weights, thresholds, best practices, detection checks) encapsulated in `ArchetypeDefinition` dataclasses registered in a central registry (`src/classifier_registry.py`). Invoice-pulse flask-service rules migrated 1:1 into `src/archetypes/flask_service.py` (25 roles, 4+25+30 classification rules, 8 scoring profiles, 5 thresholds, 15 best practices, 8+1 detection checks). `SCAN_TARGETS` refactored from flat path strings to `{path, language, archetype}` dicts. Hardcoded seeds removed from `db.py`; per-cycle seeding via idempotent `INSERT OR IGNORE` in `cycle.py`. `functional_roles` table gained `archetype TEXT` column. Byte-identical regression gate confirmed: cycle 20, 3688 rows, SHA-256 `ed9cd299...` unchanged. 248 tests (246 pass, 2 pre-existing disk-space failures). QA PASS. SA blueprint: `knowledge/architecture/archetype-flask-service-migration-blueprint-2026-06-09.md`. Dev log: `knowledge/development/archetype-flask-service-migration-2026-06-09.md`. QA: `knowledge/qa/2026-06-09-archetype-flask-service-migration-qa.md`.
 
