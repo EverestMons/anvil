@@ -6,6 +6,10 @@ Lightweight capture of mid-session observations and deferred work. Each entry is
 
 ## Open
 
+### 2026-06-08 — Finish decoupling resolve_dependencies from Python AST (prereq for non-Python extractors)
+
+Build Plan 1 (extraction contract + language-extractor decoupling, commit `602e72f`) made extraction registry-dispatched behind the `LanguageExtractor` protocol, but `import ast` remains in `extractor.py`'s `resolve_dependencies()` for inheritance-edge resolution — module-path resolution was abstracted (blueprint B.5 item 4) but inheritance resolution was not. Harmless today (Python is the only registered extractor) but it would break a Swift/TS extractor. **Fix before any non-Python head:** move inheritance-edge resolution into the `LanguageExtractor` (each extractor resolves its own inheritance) so `resolve_dependencies()` is fully language-agnostic. Priority: blocks multi-language extraction (the deferred large head); not urgent until then.
+
 ### 2026-06-08 — Enforce project_id scoping invariant on health_scores-joining finding queries
 
 **Context:** Bellows cycle 1 (first multi-project run) leaked invoice-pulse chunks into bellows findings — `find_coverage_gaps` and `find_coupling_hotspots` filtered on `cycle_id` alone, and `cycle_id` is per-project (not globally unique, `cycle.py` `MAX(cycle_number WHERE project_id)+1`), so cycle N collides across projects sharing it. Fixed in `executable-anvil-lab-project-scope-fix-v2-2026-06-08` (commit `ff00ab8`): added `cc.project_id = ?` to both; regression test `test_finding_functions_project_scoped` added; validated by cycle 2 (commit `7e70af9` — 0 coverage gaps for bellows, 47 would-be-leaked rows all project_id=1). The SA audit confirmed the other 9 query surfaces already scoped.
