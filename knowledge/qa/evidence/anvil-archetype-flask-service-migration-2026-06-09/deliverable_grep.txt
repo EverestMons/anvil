@@ -1,0 +1,53 @@
+Deliverable Verification — Grep Evidence
+==========================================
+
+1. src/classifier_registry.py — ArchetypeDefinition + registry
+   grep "class ArchetypeDefinition" → 14:class ArchetypeDefinition:
+   grep "register_archetype|get_archetype|ARCHETYPES" →
+     28:ARCHETYPES: dict[str, ArchetypeDefinition] = {}
+     31:def register_archetype(archetype: ArchetypeDefinition) -> None:
+     36:def get_archetype(name: str) -> ArchetypeDefinition:
+
+2. src/archetypes/__init__.py — imports flask_service
+   grep "import.*flask_service" → 2:from src.archetypes import flask_service  # noqa: F401
+
+3. src/archetypes/flask_service.py — registers archetype
+   grep "register_archetype" → 13:from src.classifier_registry import ArchetypeDefinition, register_archetype
+                                 319:register_archetype(flask_service)
+
+4. src/classifier.py — classify_chunk takes archetype
+   grep "def classify_chunk" → 20:def classify_chunk(chunk_dict: dict, archetype: ArchetypeDefinition) -> Optional[str]:
+
+5. src/config.py — SCAN_TARGETS dict form with archetype field
+   grep "archetype" → 16:"archetype": "flask_service", 21:"archetype": "flask_service"
+
+6. src/scorer.py — score_project takes archetype
+   grep "def score_project" → 28:def score_project(conn, project_name: str, cycle_id: int,
+   grep "archetype" → 29:archetype: ArchetypeDefinition = None, 117:role_weights = archetype.scoring_weights if archetype else {}
+
+7. src/cycle.py — seed_archetype_data present
+   grep "seed_archetype_data" → 26:def seed_archetype_data(conn, archetype) -> None:
+                                  70:seed_archetype_data(conn, archetype)
+
+8. src/db.py — hardcoded seeds removed
+   grep "FUNCTIONAL_ROLE_SEEDS|_seed_functional_roles|_seed_best_practices|BEST_PRACTICE_SEEDS" → 0 matches (CONFIRMED REMOVED)
+
+9. src/detector.py — check_best_practice takes checks params
+   grep "def check_best_practice" → 12:def check_best_practice(chunk: dict, practice: dict,
+
+10. src/lab.py — find_best_practice_deviations takes archetype
+    grep "find_best_practice_deviations" →
+      77:bp_deviations = find_best_practice_deviations(conn, project_id, cycle_id, archetype)
+      339:def find_best_practice_deviations(conn, project_id: int, cycle_id: int,
+
+11. src/scanner.py — SCAN_TARGETS dict access
+    grep 'SCAN_TARGETS.*path' → 38:project_path = SCAN_TARGETS[project_name]["path"]
+
+12. src/extractor.py — SCAN_TARGETS dict access
+    grep 'SCAN_TARGETS.*get.*path' → 42:project_path = SCAN_TARGETS.get(project_name, {}).get("path")
+
+13. Test files verified to exist:
+    tests/test_classifier_registry.py (new, 8 tests)
+    tests/test_classifier.py tests/test_scorer.py tests/test_cycle.py
+    tests/test_detector.py tests/test_best_practices.py tests/test_extractor.py
+    tests/test_lab.py tests/test_scanner.py — all present

@@ -106,6 +106,18 @@
 **What happened:** QA executed cleanly. All deliverables verified, prune correctness confirmed on DB copy (all deltas match blueprint exactly), bypass-surface filters confirmed working, 238/238 tests passed. The worktree path issue (no `anvil/` prefix, DB in main repo) is previously documented and was handled without friction.
 **Recommendation:** No new prompt feedback. Plan's QA step was well-specified with clear evidence-file requirements and verification criteria.
 
+### 2026-06-09 — Archetype migration: DEV step did not apply live DB migration
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 3 — QA deliverable verification.
+**What happened:** The DEV step added the `archetype TEXT` column migration code to `db.py:270-275` (idempotent `ALTER TABLE` with try/except guard) but did not execute it against the live DB at `/Users/marklehn/Developer/GitHub/anvil/anvil.db`. The QA step discovered the column was missing during deliverable verification and applied the migration. The migration is safe (idempotent, no data loss) but should have been applied during DEV.
+**Recommendation:** When a plan specifies that a schema migration should be "applied to the live main-repo DB", the DEV step should both (a) add the migration code AND (b) run init_db or the specific migration against the live DB. The QA step should verify the column exists, not apply it.
+
+### 2026-06-09 — Archetype migration: SA name rule count miscount
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 3 — archetype wiring verification.
+**What happened:** SA blueprint Section 4 listed 21 NAME_RULES. Actual count in pre-migration `classifier.py:25-51` was 25 (verified via `git show HEAD~1:src/classifier.py`). The archetype correctly contains all 25 name rules. Regression hash match confirms no rules were lost or added.
+**Recommendation:** SA consumer enumerations should count entries programmatically rather than estimating from line ranges.
+
 ### 2026-06-08 — Extraction contract: SQLite table-rename FK reference trap
 **Agent:** Anvil Developer
 **Plan step:** Step 1B5 — chunk_type CHECK constraint migration.

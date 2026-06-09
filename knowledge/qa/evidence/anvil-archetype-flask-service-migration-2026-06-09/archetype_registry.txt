@@ -1,0 +1,21 @@
+Archetype Registry Verification
+================================
+
+get_archetype('flask_service') returns:
+  Name: flask_service
+  Roles count: 25
+  Decorator rules count: 4
+  Name rules count: 25
+  File path rules count: 30
+  Scoring weights count: 8
+  Role thresholds count: 5
+  Best practices count: 15
+  Content checks count: 8
+  Structural checks count: 1
+  Roles groups: {'validation_pipeline', 'intelligence_layer', 'web_layer', 'infrastructure', 'data_layer'}
+
+classify_chunk consumes archetype:
+  Verified via test_classifier_registry.py + test_classifier.py (all passed)
+  classify_chunk(chunk_dict, archetype) signature confirmed at src/classifier.py:20
+
+SA blueprint count note: SA listed 21 name rules; actual is 25 (SA miscounted lines 25-51 of original classifier.py which contained 25 entries). Regression hash match confirms all rules migrated correctly.

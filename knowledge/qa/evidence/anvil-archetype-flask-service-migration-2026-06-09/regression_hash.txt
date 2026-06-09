@@ -1,0 +1,9 @@
+Regression Harness — Byte-Identical Gate
+=========================================
+Baseline (SA blueprint, pre-BP2):
+  cycle=20 rows=3688 hash=ed9cd2993d394b26b69c66e4c678727970eeea1038c9fd4de06c605ed0334bae
+
+After BP2 (QA run, read-only against live DB):
+  cycle=20 rows=3688 hash=ed9cd2993d394b26b69c66e4c678727970eeea1038c9fd4de06c605ed0334bae
+
+RESULT: MATCH — byte-identical regression confirmed.

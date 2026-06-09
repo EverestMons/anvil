@@ -1,0 +1,15 @@
+PRAGMA table_info(functional_roles) — Live DB (/Users/marklehn/Developer/GitHub/anvil/anvil.db)
+===============================================================================================
+
+Before QA fix:
+  [('id', 'INTEGER'), ('name', 'TEXT'), ('description', 'TEXT'), ('parent_role', 'TEXT'), ('scoring_weights', 'TEXT'), ('created_at', 'TEXT')]
+  archetype column: MISSING
+
+QA applied idempotent migration (ALTER TABLE functional_roles ADD COLUMN archetype TEXT):
+  Migration applied: archetype column added to functional_roles
+
+After fix:
+  [('id', 'INTEGER'), ('name', 'TEXT'), ('description', 'TEXT'), ('parent_role', 'TEXT'), ('scoring_weights', 'TEXT'), ('created_at', 'TEXT'), ('archetype', 'TEXT')]
+  archetype column: PRESENT
+
+NOTE: DEV step added migration code to db.py:270-275 but did not execute it against the live DB. QA applied the idempotent migration. The migration is try/except guarded and safe to re-run.

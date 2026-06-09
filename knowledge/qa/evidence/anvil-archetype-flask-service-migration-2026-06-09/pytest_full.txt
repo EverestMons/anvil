@@ -1,0 +1,12 @@
+pytest tests/ -v
+========================================================
+248 total: 246 passed, 2 failed in 1.49s
+
+FAILED tests:
+  tests/test_scanner.py::test_prune_removes_orphan_chunks - OSError: [Errno 28] No space left on device
+  tests/test_scanner.py::test_prune_idempotent - OSError: [Errno 28] No space left on device
+
+Both failures are pre-existing disk-space OSError in test_scanner prune tests (attempt to copy 1.3GB anvil.db to backup). These are environment-specific, not related to the archetype migration. DEV receipt documented same 2 failures.
+
+New test file: tests/test_classifier_registry.py — 8/8 passed
+Baseline: 240 tests (pre-BP2). Post-BP2: 248 tests (8 new archetype tests added).

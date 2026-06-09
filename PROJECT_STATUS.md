@@ -1,7 +1,7 @@
 # Anvil — Project Status
 
 **Status:** Operational
-**Last Updated:** 2026-06-05 (orphan-chunk reconciliation)
+**Last Updated:** 2026-06-09 (archetype pattern + flask_service migration)
 
 ---
 
@@ -10,6 +10,8 @@
 Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated against invoice-pulse. Cross-validated against specialist file facts (10/10 PASS). Findings quality assessed — coverage gaps are highest-value (81% signal), Planner integration protocol defined.
 
 ## Completed Milestones
+
+- **2026-06-09: Archetype pattern + flask_service migration shipped** — All project-type-specific rules (classification, scoring weights, thresholds, best practices, detection checks) encapsulated in `ArchetypeDefinition` dataclasses registered in a central registry (`src/classifier_registry.py`). Invoice-pulse flask-service rules migrated 1:1 into `src/archetypes/flask_service.py` (25 roles, 4+25+30 classification rules, 8 scoring profiles, 5 thresholds, 15 best practices, 8+1 detection checks). `SCAN_TARGETS` refactored from flat path strings to `{path, language, archetype}` dicts. Hardcoded seeds removed from `db.py`; per-cycle seeding via idempotent `INSERT OR IGNORE` in `cycle.py`. `functional_roles` table gained `archetype TEXT` column. Byte-identical regression gate confirmed: cycle 20, 3688 rows, SHA-256 `ed9cd299...` unchanged. 248 tests (246 pass, 2 pre-existing disk-space failures). QA PASS. SA blueprint: `knowledge/architecture/archetype-flask-service-migration-blueprint-2026-06-09.md`. Dev log: `knowledge/development/archetype-flask-service-migration-2026-06-09.md`. QA: `knowledge/qa/2026-06-09-archetype-flask-service-migration-qa.md`.
 
 - **2026-06-05: Orphan-chunk reconciliation shipped (deleted-file prune + bypass-surface freshness filters)** — Two-part fix for orphan `code_chunks` rows leaking through Lab paths that bypass `health_scores`. **(a2) Deleted-file prune:** `prune_deleted_file_orphans()` added to `scan_project()` after `discover_files()`, removes all chunks whose source file no longer exists on disk (2,652 chunks across 1,601 file_paths pruned at cycle 20; 2,400 modules + 252 children). Pre-prune timestamped backup to `backups/`. CASCADE handles all 7 dependent tables. CEO-approved destructive operation (path (a), 2026-06-05). **(a1) Bypass-surface freshness filters:** `last_seen_cycle = cycle_id` filter added to `find_clone_candidates` (both sides), `find_best_practice_deviations` (signature change: +cycle_id), and all 7 queries in `generate_specialist_update_data` (signature change: +cycle_id). Excludes 154 BP deviations and 88 clone candidates from surviving-file orphans. 238 tests pass (9 new: 4 prune, 4 filter, 1 cascade). QA PASS. SA blueprint: `knowledge/architecture/orphan-chunk-reconciliation-blueprint-2026-06-05.md`. Dev log: `knowledge/development/orphan-chunk-reconciliation-2026-06-05.md`. QA: `knowledge/qa/orphan-chunk-reconciliation-qa-2026-06-05.md`. Plan: `executable-anvil-orphan-chunk-reconciliation-2026-06-05.md`.
 

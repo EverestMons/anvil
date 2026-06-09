@@ -1,0 +1,21 @@
+Seed Lifecycle Verification
+===========================
+
+1. init_db creates empty tables:
+   Verified via test_classifier_registry.py::test_init_db_seeds_nothing (PASSED)
+   Code path: db.py init_db() no longer calls _seed_functional_roles or _seed_best_practices
+   Grep confirmation: grep for FUNCTIONAL_ROLE_SEEDS/_seed_functional_roles/_seed_best_practices in src/db.py = 0 matches
+
+2. seed_archetype_data populates:
+   Verified via test_classifier_registry.py::test_seed_archetype_data_populates (PASSED)
+   Code path: cycle.py seed_archetype_data(conn, archetype) uses INSERT OR IGNORE
+   Expected: 25 roles, 15 best practices from flask_service archetype
+
+3. Re-seed is idempotent:
+   Verified via test_classifier_registry.py::test_seed_archetype_data_idempotent (PASSED)
+   Code path: INSERT OR IGNORE prevents duplicates on re-run
+
+All 8 test_classifier_registry.py tests passed in the full suite run.
+
+NOTE: Dedicated seed lifecycle script could not run due to disk space constraints (ENOSPC).
+Evidence derived from passing test suite (tests/test_classifier_registry.py covers all three scenarios).
