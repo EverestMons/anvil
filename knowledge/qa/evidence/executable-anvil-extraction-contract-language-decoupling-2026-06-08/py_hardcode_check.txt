@@ -1,0 +1,16 @@
+Check 4: .py Hardcode Removal in extractor.py
+Date: 2026-06-09
+
+Command: grep -n 'endswith(".py")\|\.py")\)' src/extractor.py
+
+Output: (no matches)
+
+Verification: src/extractor.py no longer contains .endswith(".py") or
+similar .py-literal gating for extraction dispatch. Extension dispatch
+goes through registry.get_extractor(os.path.splitext(file_path)[1]).
+
+Note: "import ast" remains in extractor.py for inheritance resolution
+in resolve_dependencies() — this is Python-specific AST usage that
+persists in the core (flagged by DEV for future abstraction).
+
+Result: PASS

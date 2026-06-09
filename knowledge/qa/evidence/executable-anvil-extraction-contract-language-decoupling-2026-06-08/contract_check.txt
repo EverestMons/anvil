@@ -1,0 +1,15 @@
+Check 1: Contract + Registry Conformance
+Date: 2026-06-09
+
+Command: python3 -c "from src.parsers import registry; from src.parsers.python_parser import PythonExtractor; print(registry.get_extractor('.py'))"
+
+Output:
+<src.parsers.python_parser.PythonExtractor object at 0x10549e580>
+
+Verification:
+- src/contracts.py defines: ChunkRecord, LanguageExtractor (Protocol), StructuralMetadata, SymbolData, ImportRecord, DefinitionRecord, CallRecord, TestMappingRecord, UNIVERSAL_CHUNK_TYPES
+- src/parsers/registry.py defines: register(), get_extractor(), EXTRACTORS dict
+- PythonExtractor implements LanguageExtractor protocol (language="python", file_extensions={".py"})
+- PythonExtractor is registered and returned by registry.get_extractor(".py")
+
+Result: PASS

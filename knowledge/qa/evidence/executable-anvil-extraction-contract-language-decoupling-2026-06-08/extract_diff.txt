@@ -1,0 +1,19 @@
+Check 2: Extraction Before/After Comparison
+Date: 2026-06-09
+
+=== Baseline (BEFORE changes) ===
+invoice-pulse: chunk_count=8206, hash=b33a4447630f28a93a7a0bb9d47c5efa077932733517efeceed9c58b5da3f162
+bellows:        chunk_count=3695, hash=0e70adf05598a1afdc7a6324542c10d2e2a4f719e1915db56f0734a10283341e
+
+=== After (AFTER refactored code) ===
+invoice-pulse: chunk_count=8206, hash=b33a4447630f28a93a7a0bb9d47c5efa077932733517efeceed9c58b5da3f162
+bellows:        chunk_count=3695, hash=0e70adf05598a1afdc7a6324542c10d2e2a4f719e1915db56f0734a10283341e
+
+=== Comparison ===
+invoice-pulse: IDENTICAL (count match, hash match)
+bellows:        IDENTICAL (count match, hash match)
+
+Hash method: SHA-256 over rows ordered by (file_path, start_line),
+  each row = name|file_path|chunk_type|content_hash|structural_metadata
+
+Result: PASS

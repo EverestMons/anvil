@@ -1,0 +1,23 @@
+Check 6: Scope Guard — Changed Files
+Date: 2026-06-09
+
+Command: git diff HEAD~1 --name-only
+(Note: git diff --cached empty because DEV already committed; using HEAD~1 for the commit diff)
+
+Changed files:
+knowledge/development/extraction-contract-language-decoupling-2026-06-08.md
+knowledge/qa/evidence/executable-anvil-extraction-contract-language-decoupling-2026-06-08/extract_after.txt
+knowledge/qa/evidence/executable-anvil-extraction-contract-language-decoupling-2026-06-08/extract_baseline.txt
+knowledge/research/agent-prompt-feedback.md
+src/contracts.py
+src/db.py
+src/extractor.py
+src/parsers/python_parser.py
+src/parsers/registry.py
+tests/test_db.py
+
+Scope guard verification:
+- src/classifier.py: NOT modified (not in changed files list)
+- src/config.py (SCAN_TARGETS): NOT modified (not in changed files list)
+
+Result: PASS

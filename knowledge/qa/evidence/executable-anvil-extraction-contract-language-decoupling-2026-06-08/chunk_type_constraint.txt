@@ -1,0 +1,33 @@
+Check 3: chunk_type Constraint Relaxation
+Date: 2026-06-09
+DB: /Users/marklehn/Developer/GitHub/anvil/anvil.db
+
+=== code_chunks CREATE TABLE (from sqlite_master) ===
+CREATE TABLE "code_chunks" (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        file_path       TEXT    NOT NULL,
+        chunk_type      TEXT    NOT NULL,
+        name            TEXT    NOT NULL,
+        content         TEXT    NOT NULL,
+        content_hash    TEXT    NOT NULL,
+        start_line      INTEGER NOT NULL,
+        end_line        INTEGER NOT NULL,
+        parent_chunk_id INTEGER REFERENCES code_chunks(id) ON DELETE SET NULL,
+        created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+        updated_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+        cycle_id        INTEGER,
+        last_seen_cycle INTEGER,
+        structural_metadata TEXT,
+        functional_role TEXT
+    )
+
+chunk_type CHECK constraint present: False
+
+=== Chunk counts per project ===
+bellows: 3695
+invoice-pulse: 8206
+
+Counts match baseline (bellows=3695, invoice-pulse=8206). No data loss.
+
+Result: PASS
