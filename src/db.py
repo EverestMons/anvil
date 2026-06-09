@@ -36,7 +36,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
             file_path       TEXT    NOT NULL,
-            chunk_type      TEXT    NOT NULL CHECK (chunk_type IN ('function', 'class', 'method', 'module', 'config', 'test_case')),
+            chunk_type      TEXT    NOT NULL,
             name            TEXT    NOT NULL,
             content         TEXT    NOT NULL,
             content_hash    TEXT    NOT NULL,
@@ -264,8 +264,77 @@ def init_db(conn: sqlite3.Connection) -> None:
     except sqlite3.OperationalError:
         pass  # Column already exists
 
+    # Migration: relax chunk_type CHECK constraint (allow any string)
+    _migrate_chunk_type_constraint(conn)
+
     _seed_functional_roles(conn)
     _seed_best_practices(conn)
+
+
+def _migrate_chunk_type_constraint(conn: sqlite3.Connection) -> None:
+    """Drop the closed CHECK constraint on code_chunks.chunk_type.
+
+    SQLite cannot ALTER a CHECK constraint, so this recreates the table
+    without it and copies all existing rows.  The migration is idempotent:
+    if the table already lacks the CHECK it is a harmless no-op (the
+    CREATE TABLE IF NOT EXISTS in init_db already uses the relaxed schema).
+    """
+    # Detect whether the existing table still has the CHECK constraint
+    cur = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='code_chunks'"
+    )
+    row = cur.fetchone()
+    if row is None:
+        return  # Table doesn't exist yet — init_db will create it fresh
+    create_sql = row[0]
+    if "CHECK" not in create_sql:
+        return  # Already relaxed
+
+    conn.executescript("""
+        PRAGMA foreign_keys=OFF;
+
+        CREATE TABLE IF NOT EXISTS code_chunks_new (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            file_path       TEXT    NOT NULL,
+            chunk_type      TEXT    NOT NULL,
+            name            TEXT    NOT NULL,
+            content         TEXT    NOT NULL,
+            content_hash    TEXT    NOT NULL,
+            start_line      INTEGER NOT NULL,
+            end_line        INTEGER NOT NULL,
+            parent_chunk_id INTEGER REFERENCES code_chunks(id) ON DELETE SET NULL,
+            created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+            cycle_id        INTEGER,
+            last_seen_cycle INTEGER,
+            structural_metadata TEXT,
+            functional_role TEXT
+        );
+
+        INSERT INTO code_chunks_new
+            SELECT id, project_id, file_path, chunk_type, name, content,
+                   content_hash, start_line, end_line, parent_chunk_id,
+                   created_at, updated_at, cycle_id, last_seen_cycle,
+                   structural_metadata, functional_role
+            FROM code_chunks;
+
+        DROP TABLE code_chunks;
+        ALTER TABLE code_chunks_new RENAME TO code_chunks;
+
+        -- Recreate indexes
+        CREATE INDEX IF NOT EXISTS idx_code_chunks_project_file
+            ON code_chunks(project_id, file_path);
+        CREATE INDEX IF NOT EXISTS idx_code_chunks_chunk_type
+            ON code_chunks(chunk_type);
+        CREATE INDEX IF NOT EXISTS idx_code_chunks_parent
+            ON code_chunks(parent_chunk_id);
+        CREATE INDEX IF NOT EXISTS idx_code_chunks_content_hash
+            ON code_chunks(content_hash);
+
+        PRAGMA foreign_keys=ON;
+    """)
+    conn.commit()
 
 
 # --- projects ---

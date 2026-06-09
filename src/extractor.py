@@ -1,7 +1,7 @@
 """
 Anvil Stage 2 — code extraction orchestrator.
 
-Processes scanned files through the Python parser, stores chunks with parent
+Processes scanned files through language extractors, stores chunks with parent
 linkage, creates symbol bindings and dependencies, computes MinHash fingerprints,
 and detects similarities.
 """
@@ -16,7 +16,10 @@ from typing import Optional
 
 from src import db
 from src.config import MINHASH_NUM_PERM, MINHASH_THRESHOLD, SCAN_TARGETS
-from src.parsers import python_parser
+from src.parsers import registry
+
+# Ensure the Python extractor is registered
+from src.parsers import python_parser  # noqa: F401
 
 try:
     from datasketch import MinHash, MinHashLSH
@@ -40,7 +43,7 @@ def extract_project(conn, project_name: str, cycle_id: int) -> dict:
     if project_path is None:
         raise ValueError(f"No scan target for project: {project_name}")
 
-    # Query all module chunks (file-level), filter to .py
+    # Query all module chunks (file-level)
     conn.row_factory = db._row_to_dict
     cur = conn.execute(
         "SELECT * FROM code_chunks WHERE project_id = ? AND chunk_type = 'module'",
@@ -49,16 +52,24 @@ def extract_project(conn, project_name: str, cycle_id: int) -> dict:
     module_chunks = cur.fetchall()
     conn.row_factory = None
 
-    py_modules = [m for m in module_chunks if m["file_path"].endswith(".py")]
+    extractable_modules = [
+        m for m in module_chunks
+        if registry.get_extractor(os.path.splitext(m["file_path"])[1]) is not None
+    ]
 
     files_processed = 0
     chunks_created = 0
     chunks_updated = 0
     symbols_extracted = 0
 
-    for module_chunk in py_modules:
+    for module_chunk in extractable_modules:
         abs_path = os.path.join(project_path, module_chunk["file_path"])
         if not os.path.isfile(abs_path):
+            continue
+
+        file_ext = os.path.splitext(module_chunk["file_path"])[1]
+        extractor = registry.get_extractor(file_ext)
+        if extractor is None:
             continue
 
         # Path A: stamp module chunk as seen in this cycle
@@ -67,7 +78,7 @@ def extract_project(conn, project_name: str, cycle_id: int) -> dict:
             (cycle_id, module_chunk["id"]),
         )
 
-        parsed_chunks = python_parser.parse_file(abs_path)
+        parsed_chunks = extractor.parse_file(abs_path)
         if not parsed_chunks:
             files_processed += 1
             continue
@@ -142,33 +153,31 @@ def extract_project(conn, project_name: str, cycle_id: int) -> dict:
         try:
             with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
                 source = f.read()
-            tree = ast.parse(source, filename=abs_path)
-            source_lines = source.splitlines(True)
 
-            file_symbols = python_parser.extract_symbols(
-                abs_path, source_lines, tree
-            )
+            file_symbols = extractor.extract_symbols(abs_path, source)
             symbols_extracted += _store_file_symbols(
                 conn, project_id, module_chunk, file_symbols
             )
 
             # Structural metadata for each chunk in this file
-            _store_file_metadata(
-                conn, project_id, module_chunk["file_path"], tree, source_lines
+            _store_file_metadata_via_extractor(
+                conn, project_id, module_chunk["file_path"],
+                parsed_chunks, extractor,
             )
 
-            # SQLAlchemy models
-            sa_models = python_parser.detect_sqlalchemy_models(tree, source_lines)
-            for model in sa_models:
-                class_cid = class_chunk_ids.get(model["class_name"])
-                if class_cid:
-                    for binding in model["symbol_bindings"]:
-                        db.create_symbol_binding(
-                            conn, class_cid,
-                            binding["symbol_name"],
-                            binding["binding_type"],
-                        )
-                        symbols_extracted += 1
+            # Language-specific post-parse hooks (e.g. SQLAlchemy detection)
+            if hasattr(extractor, "detect_sqlalchemy_models"):
+                sa_models = extractor.detect_sqlalchemy_models(source, abs_path)
+                for model in sa_models:
+                    class_cid = class_chunk_ids.get(model["class_name"])
+                    if class_cid:
+                        for binding in model["symbol_bindings"]:
+                            db.create_symbol_binding(
+                                conn, class_cid,
+                                binding["symbol_name"],
+                                binding["binding_type"],
+                            )
+                            symbols_extracted += 1
 
         except (SyntaxError, OSError):
             pass
@@ -339,39 +348,20 @@ def _store_file_symbols(conn, project_id: int, module_chunk: dict,
     return count
 
 
-def _store_file_metadata(conn, project_id: int, file_path: str,
-                         tree: ast.Module, source_lines: list[str]) -> None:
-    """Compute and store structural metadata for all chunks in a file."""
-    for node in ast.iter_child_nodes(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            chunk_type = "test_case" if node.name.startswith("test_") else "function"
-            chunk = _find_existing_chunk(
-                conn, project_id, file_path, node.name, chunk_type,
+def _store_file_metadata_via_extractor(conn, project_id: int, file_path: str,
+                                        parsed_chunks: list[dict],
+                                        extractor) -> None:
+    """Compute and store structural metadata for all chunks via the extractor."""
+    for chunk_dict in parsed_chunks:
+        chunk = _find_existing_chunk(
+            conn, project_id, file_path,
+            chunk_dict["name"], chunk_dict["chunk_type"],
+        )
+        if chunk:
+            meta = extractor.compute_structural_metadata(
+                chunk_dict["content"], chunk_dict["chunk_type"],
             )
-            if chunk:
-                meta = python_parser.compute_structural_metadata(node, source_lines)
-                store_structural_metadata(conn, chunk["id"], meta)
-
-        elif isinstance(node, ast.ClassDef):
-            chunk = _find_existing_chunk(
-                conn, project_id, file_path, node.name, "class",
-            )
-            if chunk:
-                meta = python_parser.compute_structural_metadata(node, source_lines)
-                store_structural_metadata(conn, chunk["id"], meta)
-
-            is_test_class = node.name.startswith("Test")
-            for child in node.body:
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    child_type = "test_case" if (child.name.startswith("test_") or is_test_class) else "method"
-                    child_chunk = _find_existing_chunk(
-                        conn, project_id, file_path, child.name, child_type,
-                    )
-                    if child_chunk:
-                        meta = python_parser.compute_structural_metadata(
-                            child, source_lines
-                        )
-                        store_structural_metadata(conn, child_chunk["id"], meta)
+            store_structural_metadata(conn, chunk["id"], meta)
 
 
 def store_symbols(conn, chunk_id: int, symbols: dict) -> int:
@@ -414,12 +404,16 @@ def resolve_dependencies(conn, project_id: int) -> int:
     for c in all_chunks:
         by_name.setdefault(c["name"], []).append(c)
 
-    # file_path lookup: convert module path to file_path
+    # file_path lookup: convert module path to language-specific module id
     by_file = {}
     for c in all_chunks:
         if c["chunk_type"] == "module":
-            # Strip .py and convert to dot notation
-            mod_name = c["file_path"].replace("/", ".").replace(".py", "")
+            file_ext = os.path.splitext(c["file_path"])[1]
+            ext = registry.get_extractor(file_ext)
+            if ext is not None:
+                mod_name = ext.resolve_module_path(c["file_path"])
+            else:
+                mod_name = c["file_path"].replace("/", ".").replace(".py", "")
             by_file[mod_name] = c
 
     # Get all import bindings for this project

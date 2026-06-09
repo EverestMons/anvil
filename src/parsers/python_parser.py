@@ -352,3 +352,46 @@ def detect_sqlalchemy_models(ast_tree: ast.Module,
         })
 
     return models
+
+
+# --- PythonExtractor class (wraps module functions) ---
+
+class PythonExtractor:
+    """LanguageExtractor implementation for Python source files."""
+
+    language: str = "python"
+    file_extensions: set[str] = {".py"}
+
+    def parse_file(self, file_path: str) -> list[dict]:
+        """Parse a Python file and return chunk records."""
+        return parse_file(file_path)
+
+    def extract_symbols(self, file_path: str, source: str) -> dict:
+        """Extract symbol data from a Python source file."""
+        tree = ast.parse(source, filename=file_path)
+        source_lines = source.splitlines(True)
+        return extract_symbols(file_path, source_lines, tree)
+
+    def compute_structural_metadata(self, chunk_content: str,
+                                     chunk_type: str) -> dict:
+        """Compute structural metrics for a single chunk."""
+        tree = ast.parse(chunk_content)
+        node = tree.body[0] if tree.body else tree
+        source_lines = chunk_content.splitlines(True)
+        return compute_structural_metadata(node, source_lines)
+
+    def detect_sqlalchemy_models(self, source: str,
+                                  file_path: str = "") -> list[dict]:
+        """Post-parse hook: detect SQLAlchemy model patterns."""
+        tree = ast.parse(source, filename=file_path)
+        source_lines = source.splitlines(True)
+        return detect_sqlalchemy_models(tree, source_lines)
+
+    def resolve_module_path(self, file_path: str) -> str:
+        """Convert a Python file path to a dot-notation module identifier."""
+        return file_path.replace("/", ".").replace(".py", "")
+
+
+# Auto-register the Python extractor
+from src.parsers import registry as _registry  # noqa: E402
+_registry.register(PythonExtractor())

@@ -105,3 +105,9 @@
 **Plan step:** Step 3 — QA verification of orphan-chunk reconciliation.
 **What happened:** QA executed cleanly. All deliverables verified, prune correctness confirmed on DB copy (all deltas match blueprint exactly), bypass-surface filters confirmed working, 238/238 tests passed. The worktree path issue (no `anvil/` prefix, DB in main repo) is previously documented and was handled without friction.
 **Recommendation:** No new prompt feedback. Plan's QA step was well-specified with clear evidence-file requirements and verification criteria.
+
+### 2026-06-08 — Extraction contract: SQLite table-rename FK reference trap
+**Agent:** Anvil Developer
+**Plan step:** Step 1B5 — chunk_type CHECK constraint migration.
+**What happened:** The migration creates `code_chunks_new` with a self-referencing FK (`parent_chunk_id REFERENCES code_chunks_new(id)`), then renames to `code_chunks`. SQLite preserves the FK text literally — after rename, the FK still references `code_chunks_new`, which no longer exists. Any subsequent UPDATE that triggers FK validation fails with `no such table: main.code_chunks_new`. Fixed by referencing `code_chunks(id)` in the new table definition (valid because `PRAGMA foreign_keys=OFF` during migration).
+**Recommendation:** When using the SQLite table-recreation migration pattern (create new → copy data → drop old → rename), always reference the FINAL table name in FK constraints, not the temporary name. `PRAGMA foreign_keys=OFF` prevents validation during creation, and after rename the FK points to the correct table.

@@ -287,11 +287,12 @@ def test_cycle_report_fk_requires_valid_project(conn):
 
 # --- CHECK constraint enforcement ---
 
-def test_chunk_type_check_constraint(conn, project_id):
-    with pytest.raises(sqlite3.IntegrityError):
-        create_chunk(conn, project_id=project_id, file_path="x.py",
-                     chunk_type="invalid", name="bad", content="x",
-                     content_hash="h", start_line=1, end_line=1)
+def test_chunk_type_accepts_arbitrary_strings(conn, project_id):
+    """chunk_type is no longer CHECK-constrained — any string is valid."""
+    cid = create_chunk(conn, project_id=project_id, file_path="x.py",
+                       chunk_type="struct", name="MyStruct", content="x",
+                       content_hash="h", start_line=1, end_line=1)
+    assert cid is not None
 
 
 def test_binding_type_check_constraint(conn, chunk_id):
