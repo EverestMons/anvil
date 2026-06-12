@@ -17,4 +17,4 @@
 | 5 | 2026-06-08 | Add lint/test enforcing project_id scoping invariant on health_scores-joining finding queries (context in BACKLOG-ARCHIVE.md) | deferred-work | — | open |
 | 6 | 2026-06-08 | Exclude non-source dirs (logs/, knowledge/, .pytest_cache, .claude) from SCAN file registration (context in BACKLOG-ARCHIVE.md) | deferred-work | — | open |
 | 7 | 2026-06-08 | Mono-role utility classification for non-invoice-pulse projects — add bellows role definitions if it becomes a recurring target | deferred-work | — | open |
-| 8 | 2026-06-09 | Bellows QA worktree cannot read RULE_20_SELF_CHECK_BLOCK.md from governance root — mount/symlink at dispatch | deferred-work | — | open |
+| 8 | 2026-06-09 | Bellows QA worktree cannot read RULE_20_SELF_CHECK_BLOCK.md from governance root — mount/symlink at dispatch — withdrawn 2026-06-12: condition no longer reproduces; 0 no_permission_denials across ~19 QA steps on 2026-06-12 | deferred-work | — | withdrawn |
