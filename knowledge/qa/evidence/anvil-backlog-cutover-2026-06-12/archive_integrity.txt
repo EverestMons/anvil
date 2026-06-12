@@ -1,0 +1,32 @@
+=== Archive Integrity Check ===
+Date: 2026-06-12
+Agent: Anvil QA Analyst (Step 3, Plan 15)
+
+Method: Extract archive body (below frozen-header block) from knowledge/BACKLOG-ARCHIVE.md
+and compare byte-for-byte against the pre-deletion BACKLOG.md retrieved via git.
+
+--- Commands ---
+
+1. git show 34721f1^:knowledge/BACKLOG.md
+   (34721f1 is the deletion commit; ^ gets the parent where BACKLOG.md still existed)
+
+2. Python binary read of knowledge/BACKLOG-ARCHIVE.md, body extracted starting at the
+   second "# Anvil" heading (byte offset 352), which is the original file's first line.
+
+3. Byte comparison: archive_body == original_backlog
+
+--- Results ---
+
+Original BACKLOG.md size: 32,435 bytes
+BACKLOG-ARCHIVE.md total size: 32,787 bytes
+Frozen header size: 352 bytes (title + blockquote + separator)
+Archive body size: 32,435 bytes
+
+Byte comparison: IDENTICAL (32,435 / 32,435 bytes match)
+
+Frozen header content verified:
+  Line 1: # Anvil — BACKLOG Archive (frozen 2026-06-12)
+  Lines 2-3: Blockquote with read-only freeze notice, FORWARD.md pointer, edit prohibition
+  Line 4: --- separator
+
+OVERALL: PASS

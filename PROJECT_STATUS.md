@@ -1,7 +1,7 @@
 # Anvil — Project Status
 
 **Status:** Operational
-**Last Updated:** 2026-06-09 (BP3: daemon archetype shipped)
+**Last Updated:** 2026-06-12 (Phase 3 BACKLOG cutover, Stage 2)
 
 ---
 
@@ -10,6 +10,9 @@
 Anvil is operational. Full SCAN → EXTRACT → SCORE → LAB pipeline validated against invoice-pulse. Cross-validated against specialist file facts (10/10 PASS). Findings quality assessed — coverage gaps are highest-value (81% signal), Planner integration protocol defined.
 
 ## Completed Milestones
+
+- **2026-06-12: BACKLOG-to-FORWARD register cutover (Phase 3, Stage 2 of 5)** — BACKLOG.md retired (git rm, commit 34721f1). Two new registers created: `knowledge/FORWARD.md` (8 open-class entries in diagnostic Section 4 table format) and `knowledge/BACKLOG-ARCHIVE.md` (frozen read-only copy, byte-identical body). Implements diagnostic 13, CEO Option (a): archive-freeze + delete, staged per-project. QA: 4/4 checks PASS (format conformance, entry conservation, archive integrity, trim landed). Plan 15.
+
 
 - **2026-06-09: BP3 daemon archetype shipped** — Second archetype (`daemon`) registered for bellows. 13-role taxonomy across 4 groups (orchestration, governance, configuration, infrastructure), 33 name rules + 12 file_path rules (no decorator rules), 8 scoring weight profiles, 6 role thresholds, 8 best practice rules with content/structural checks. Bellows reclassified from 100% utility (155/155) to 84.5% non-utility (131/155); 24 residual utility chunks are exclusively test helpers. Invoice-pulse classify-only hash unchanged (`59cc0d80...`, 3688 rows). 256 tests pass. Design: `knowledge/architecture/bellows-daemon-archetype-design-2026-06-09.md`. Dev log: `knowledge/development/bellows-daemon-archetype-impl-2026-06-09.md`. QA: `knowledge/qa/2026-06-09-bellows-daemon-archetype-impl-qa.md`.
 

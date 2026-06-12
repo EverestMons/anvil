@@ -1,0 +1,22 @@
+=== FORWARD.md Format Conformance Check ===
+Date: 2026-06-12
+Agent: Anvil QA Analyst (Step 3, Plan 15)
+
+Reference spec: diagnostic-13 Section 4 (governance/knowledge/research/reporting-phase-3-pre-cutover-unknowns-2026-06-12.md)
+File under test: knowledge/FORWARD.md
+
+--- Checks ---
+
+PASS: Title matches exactly: "# Anvil — Forward Register"
+PASS: Preamble blockquote present (5 lines)
+PASS: Preamble mentions "standing queue"
+PASS: Preamble mentions reconciliation rule
+PASS: 6-column table header matches exactly: "| # | Added | Item | Type | Plan-id link | Status |"
+PASS: Separator line present
+PASS: 8 data rows (matching 8 open-class entries)
+PASS: Types valid — {"deferred-work": 7, "ceo-decision-fork": 1}
+PASS: All 8 rows have status "open"
+PASS: Rows in chronological order by Added date
+PASS: Rows numbered 1-8 sequentially
+
+OVERALL: PASS
