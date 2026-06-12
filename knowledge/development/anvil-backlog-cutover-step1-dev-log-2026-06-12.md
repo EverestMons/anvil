@@ -69,3 +69,10 @@ nothing added to commit but untracked files present (use "git add" to track)
 ```
 
 BACKLOG.md does not appear in `git status` — it has not been modified, staged, or deleted. Only the two new register files appear as untracked.
+
+
+## Step 2 — Trim
+
+- **Deletion commit:** 34721f1 — `chore: BACKLOG.md retired — FORWARD.md + BACKLOG-ARCHIVE.md per Phase 3 cutover (implements diagnostic 13) [15]`
+- **git status:** clean (nothing to commit, working tree clean)
+- **ls knowledge/ | grep -i backlog:** only `BACKLOG-ARCHIVE.md` remains
