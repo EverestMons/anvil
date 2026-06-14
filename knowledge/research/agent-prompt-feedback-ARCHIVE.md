@@ -1,0 +1,134 @@
+> **FROZEN:** This is the pre-activation archive. The live feedback log is now DB-generated (daemon-owned ledgers activation, 2026-06-14).
+
+# Anvil — Agent Prompt Feedback Log
+
+## Patterns Identified
+
+### 2026-04-14 — Cycle 9: run_cycle() argument count mismatch
+**Plan step:** Step 1 — run_cycle call specified 3 arguments: `run_cycle(conn, "invoice-pulse", "/Users/marklehn/Desktop/GitHub/invoice-pulse")`.
+**What happened:** The current `run_cycle()` signature only accepts 2 args (`conn`, `project_name`). The project path is resolved internally via config. The call raised `TypeError: run_cycle() takes 2 positional arguments but 3 were given`. Corrected inline.
+**Recommendation:** Plan prompts for `run_cycle` calls should match the current 2-arg signature. Consider adding a note in `cycle.py` docstring or PLANNER_TEMPLATE.md that the path arg was removed.
+
+### 2026-04-14 — Specialist Sync: find-and-replace string mismatch
+**Plan step:** Step 1B change (3) — replace `'SCAN → EXTRACT → SCORE → LAB'` in ANVIL_SYSTEMS_ANALYST.md Role Summary.
+**What happened:** The plan's find string used arrow notation (`→`) but the file used comma notation `(SCAN, EXTRACT, SCORE, LAB)`. Python find-and-replace silently produced no match; the change was not applied. Caught in Step 2 QA.
+**Recommendation:** Plan prompts should verify the exact text present in the file before specifying a find-and-replace string, or use a broader context anchor (e.g., surrounding sentence) rather than only the pipeline string itself.
+
+### 2026-04-14 — Cycle 11: mission heading mismatch — "Given that" not injected (RESOLVED)
+**Plan step:** Step 1 — run_cycle then check mission context in what_needs_discovering.
+**What happened:** `_extract_project_mission()` in `src/lab.py` looks for headings `## Mission`, `## Overview`, or `## Purpose`. invoice-pulse's PROJECT_BRIEF.md uses `## What This Project Is`. The function returns empty string; all 20 findings fall back to the non-mission template (references PROJECT_BRIEF conceptually but omits the "Given that {mission}" sentence). QA Step 2 grep-for-"Given that" will return zero matches.
+**Resolution:** Heading pattern expanded to include `What This Project Is`, `About`, `Summary`, `Background`. Re-run confirmed "Given that" present in all findings.
+**Recommendation:** Future project briefs should be aware that `_extract_project_mission` extracts from the first `## Mission`, `## Overview`, `## Purpose`, `## What This Project Is`, `## About`, `## Summary`, or `## Background` heading. If none match, mission context will be absent from findings.
+
+### 2026-04-14 — Diagnostic: table name mismatch in plan query
+**Plan step:** diagnostic-coupling-hotspots-noise — item (3) query.
+**What happened:** The diagnostic plan specified `chunks` and `chunk_scores` as table names. The actual DB uses `code_chunks` and `health_scores`. The query raised `sqlite3.OperationalError: no such table: chunks`. Adapted inline before proceeding.
+**Recommendation:** Future diagnostic plans that embed SQL queries should use the canonical table names: `code_chunks`, `health_scores`, `chunk_dependencies`, `chunk_similarities`. The mismatch suggests the plan was authored from an earlier schema draft.
+
+### 2026-04-14 — Cycle 11 re-run: cycle_number DB offset
+**Plan step:** Step 1 fix/re-run — re-ran cycle after heading fix.
+**What happened:** The first Cycle 11 run (with empty mission) was stored as cycle_number=11. The fix re-run was stored as cycle_number=12. QA Step 2's DB check queries `WHERE cycle_number=11` — this will return the unfixed run, not the corrected one. The cycle number in cycle_reports does not match the plan name.
+**Recommendation:** Plan prompts for QA that check `WHERE cycle_number=N` should reference the actual DB cycle number from the dev log, not the plan label. Or: re-run should delete the stale cycle_report row before re-running to preserve the expected cycle_number.
+
+### 2026-04-14 — QA manual recovery: Bellows write-race stranded plan
+**Agent:** Anvil QA Analyst
+**Prompt type:** Manual Bellows-recovery bootstrap (not a plan file routed through Bellows).
+**What happened:** The `executable-anvil-test-failures-fixture-2026-04-14` plan was deposited but stranded due to a write-race during the Bellows plan deposit phase. DEV's fix commit (`c49f060`) landed successfully, but the plan was never routed to QA via Bellows. A manual QA bootstrap prompt was used to verify deliverables, run the full test suite, deposit evidence, write the QA report, pass Rule 20, update PROJECT_STATUS.md, and move the plan to Done.
+**Recommendation:** Write-races during plan deposit can strand plans in a limbo state where DEV work is done but QA never executes. When this happens, a manual QA bootstrap prompt can recover the closeout. Consider adding a Bellows health-check that detects plans with completed DEV commits but no QA evidence after a timeout period.
+
+### 2026-05-18 — Diagnostic: working directory mismatch in Bellows worktree
+**Agent:** Anvil Systems Analyst
+**Prompt type:** Bellows-dispatched diagnostic via worktree.
+**What happened:** The diagnostic plan references paths as `anvil/knowledge/...` and `anvil/anvil.db`, but the Bellows worktree root IS the anvil directory (no `anvil/` subdirectory). The DB (`anvil.db`) is not in the worktree at all — it's in the main repo at `/Users/marklehn/Developer/GitHub/anvil/anvil.db`. Agent had to discover this and adapt paths.
+**Recommendation:** Diagnostic plans dispatched through Bellows worktrees should: (1) not assume an `anvil/` prefix in paths — use relative paths from repo root, and (2) explicitly state whether the DB is in the worktree or in the main repo, since worktrees may not include untracked/gitignored files like `.db`.
+
+### 2026-05-18 — Diagnostic: cycle 9 double-count anomaly not pre-documented
+**Agent:** Anvil Systems Analyst
+**What happened:** Cycle 9 has 7,672 health_scores vs. 3,836 for cycles 10-16. The diagnostic had to choose cycle 10 as anchor instead of cycle 9 (the "first production run on 2026-04-14") to avoid data quality issues. This anomaly was not mentioned in PROJECT_STATUS or the BACKLOG entry.
+**Recommendation:** Known data quality issues in the DB should be documented in PROJECT_STATUS or a data-quality knowledge file so that future diagnostics can reference them rather than discovering them ad hoc.
+
+### 2026-05-18 — Diagnostic: volatility-attribution-replay plan quality — strong
+**Agent:** Anvil Systems Analyst
+**Prompt type:** Bellows-dispatched diagnostic via worktree.
+**What happened:** The plan was well-structured and specific. The 8-part investigation sequence was logical and the verification step (part 2) was critical — it caught potential replay errors before the analysis began. The classification thresholds (SELF_DECAYED: raw_delta ≤ -50%, DISPLACED: |raw_delta| < 20%) were reasonable but unnecessary — the actual data was so extreme (79-100% raw drops across all 20 chunks) that any reasonable threshold would have produced the same result.
+**Minor issue:** The plan specified that raw volatility is "typically a commit count or weighted commit-recency sum" — the scorer actually uses a linear-decay weighted sum (`max(0, 1 - days_ago/28)`), which is meaningfully different from a simple commit count. The plan's instruction to "read scorer.py before writing replay queries" correctly anticipated this.
+**No path issues:** The worktree path issue noted in the previous entry also applied here. The DB was at `/Users/marklehn/Developer/GitHub/anvil/anvil.db`, not in the worktree.
+
+### 2026-05-18 — QA recovery: DEV commit SHA mismatch due to rebase
+**Agent:** Anvil QA Analyst
+**Prompt type:** Bellows-dispatched QA recovery via worktree.
+**What happened:** The plan references DEV commit `d68191e`, but on main the equivalent commit is `155f3d1` (rebased). Tree hashes are identical (`79fd4a2`), `git diff` between them is empty. The SHA `d68191e` exists on branch `f9-follow-scoring-methodology-fix-2026-05-18` but is not an ancestor of HEAD/main. Check (6) ("commit landed on main") required interpreting "present" as "content-equivalent commit present" rather than exact SHA match.
+**Recommendation:** When Bellows worktrees rebase feature branches onto main, the plan's DEV commit SHA may no longer match main's history. QA plans that reference a specific SHA for verification should either: (1) include the main-branch SHA as a fallback, or (2) specify tree-hash verification as an acceptable alternative to exact SHA matching.
+
+### 2026-05-18 — Cycle 18: DB schema column name mismatch in plan queries
+**Agent:** Anvil Developer
+**Plan step:** Step 1 — pre-cycle snapshot query uses `project='invoice-pulse'` column filter.
+**What happened:** The plan's baseline snapshot query filters on `WHERE project='invoice-pulse'`, but all tables use `project_id` (integer FK to `projects` table), not a `project` text column. Similarly, the plan references `cycle_date` on `cycle_reports` which doesn't exist — the actual columns are `started_at` and `completed_at`. Also, `health_scores` uses `cycle_id` not `cycle_number`. Adapted inline using `project_id=1` and `completed_at`.
+**Recommendation:** Plan queries should use the actual schema: `project_id` (FK), `cycle_id`, `started_at`/`completed_at`. Consider a canonical query-snippet library in the plan template.
+
+### 2026-05-18 — Cycle 18: Floor violation query checks wrong column
+**Agent:** Anvil Developer
+**Plan step:** Step 1 check (7) — volatility floor sanity query.
+**What happened:** The plan queries `WHERE coverage_score >= 0.99 AND volatility_score < 0.5` expecting zero rows. Returns 1,543 rows. The floor is applied inside `compute_composite()` and affects the resulting `composite_score`, but the stored `volatility_score` column retains the raw percentile-normalized value. The floor is working correctly — verified by manual recomputation of 10 sample composites (all match floor-applied formula). The query tests the wrong column.
+**Recommendation:** Future plans should verify floor behavior by recomputing composites rather than checking stored dimension scores. The volatility_score column is the raw percentile, not the floored value.
+
+### 2026-06-03 — Diagnostic: phantom-mechanism — `rates_grid` misclassified as deleted-file (a2)
+**Agent:** Anvil Systems Analyst
+**Plan step:** Step 1 — phantom class assignment for `rates_grid` / `web/rates.py`.
+**What happened:** The plan classified `rates_grid` as a "deleted file (whole file removed in Phase 4 kill-dead-rate-routes)" to test mechanism (a2). Investigation revealed `web/rates.py` still exists on disk (443 lines, rebuilt in commit `769e420`). The function `rates_grid` was removed during the rebuild, but the file survives — making this an (a1) case, not (a2). Consequently, the diagnostic had no (a2) specimen and could not empirically test the deleted-file mechanism.
+**Recommendation:** Future diagnostics that need a deleted-file specimen should verify file non-existence before plan authoring (e.g., `ls invoice-pulse/web/rates.py`). To test (a2), find a file_path in `code_chunks` that does not exist on disk — a simple set-difference query against `discover_files()` output would identify true candidates.
+
+### 2026-06-03 — Fix plan: blueprint §7 check 8 module count estimate off by ~10x
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 3 — blueprint verification check 8 (module chunks stamped).
+**What happened:** Blueprint §7 check 8 predicted ~2,435 module chunks stamped (matching on-disk file count). Actual: 252. The extractor only iterates `.py` module chunks (`py_modules = [m for m in module_chunks if m["file_path"].endswith(".py")]`), not all modules. The 2,435 includes ~2,180 non-Python files (JSON, HTML, MD). This is not a bug — non-Python modules have no function-level children and are excluded from scoring. But the verification check's expected value was wrong.
+**Recommendation:** Blueprint verification checks that reference module-chunk counts should distinguish Python modules (~250) from total modules (~4,000+). The extractor's `.py` filter is the controlling factor.
+
+### 2026-06-03 — Diagnostic: population discontinuity — "displaced" findings were noise-filtered
+**Agent:** Anvil Systems Analyst
+**Plan step:** Step 1 — classify five displaced coupling findings.
+**What happened:** The plan's Context stated "Five legitimate cycle-19 coupling findings displaced from cycle 20" based on the QA findings_delta (Step 3 of the phantom fix plan). Investigation revealed all five are caught by `_is_noise_chunk()` (session-lifecycle and connection-factory patterns, added 2026-04-14) and were never in `find_intent_gaps()` output at either cycle. The "displacement" was an artifact of the QA delta analysis using raw SQL without the noise filter. The diagnostic's core question ("are those five genuinely lower-risk or merely displaced?") was moot.
+**Recommendation:** QA delta analyses comparing find_intent_gaps across cycles should call the actual function (or replay its noise filter in SQL) rather than raw top-N queries. The noise filter is a Python-level post-filter that silently removes high-coupling chunks matching session/connection patterns — raw SQL overstates the coupling-finding count.
+
+### 2026-06-05 — Fix plan: orphan-chunk reconciliation — worktree path + DB location
+**Agent:** Anvil Systems Analyst
+**Plan step:** Step 1 — SA blueprint for orphan-chunk reconciliation.
+**What happened:** Same worktree path issue as 2026-05-18: the worktree root IS the anvil directory (no `anvil/` prefix), and `anvil.db` is in the main repo at `/Users/marklehn/Developer/GitHub/anvil/anvil.db`, not in the worktree. The plan's bootstrap prompt and CLAUDE.md reference `anvil/` prefixed paths.
+**Recommendation:** Previously documented — see 2026-05-18 entry. No new pattern.
+
+### 2026-06-05 — Fix plan: orphan-chunk reconciliation — signature change ripple in test_detector.py
+**Agent:** Anvil Developer
+**Plan step:** Step 2 — implementation of bypass-surface freshness filters.
+**What happened:** The blueprint's test surface (§8) listed `test_scanner.py`, `test_lab.py`, `test_db.py`, and `test_cycle.py` as files to update. It did not mention `test_detector.py`, which also calls `find_best_practice_deviations()` directly (3 calls). The signature change from `(conn, project_id)` to `(conn, project_id, cycle_id)` broke those tests. Fixed by adding `cycle_id=1` and `last_seen_cycle=1` to those test fixtures.
+**Recommendation:** Blueprint §8 test-surface enumeration should grep for all callers of functions whose signatures change, not just the primary test files. `grep -r "find_best_practice_deviations" tests/` would have caught test_detector.py.
+
+### 2026-06-05 — QA Step 3: no new issues — clean execution
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 3 — QA verification of orphan-chunk reconciliation.
+**What happened:** QA executed cleanly. All deliverables verified, prune correctness confirmed on DB copy (all deltas match blueprint exactly), bypass-surface filters confirmed working, 238/238 tests passed. The worktree path issue (no `anvil/` prefix, DB in main repo) is previously documented and was handled without friction.
+**Recommendation:** No new prompt feedback. Plan's QA step was well-specified with clear evidence-file requirements and verification criteria.
+
+### 2026-06-09 — Archetype migration: DEV step did not apply live DB migration
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 3 — QA deliverable verification.
+**What happened:** The DEV step added the `archetype TEXT` column migration code to `db.py:270-275` (idempotent `ALTER TABLE` with try/except guard) but did not execute it against the live DB at `/Users/marklehn/Developer/GitHub/anvil/anvil.db`. The QA step discovered the column was missing during deliverable verification and applied the migration. The migration is safe (idempotent, no data loss) but should have been applied during DEV.
+**Recommendation:** When a plan specifies that a schema migration should be "applied to the live main-repo DB", the DEV step should both (a) add the migration code AND (b) run init_db or the specific migration against the live DB. The QA step should verify the column exists, not apply it.
+
+### 2026-06-09 — Archetype migration: SA name rule count miscount
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 3 — archetype wiring verification.
+**What happened:** SA blueprint Section 4 listed 21 NAME_RULES. Actual count in pre-migration `classifier.py:25-51` was 25 (verified via `git show HEAD~1:src/classifier.py`). The archetype correctly contains all 25 name rules. Regression hash match confirms no rules were lost or added.
+**Recommendation:** SA consumer enumerations should count entries programmatically rather than estimating from line ranges.
+
+### 2026-06-08 — Extraction contract: SQLite table-rename FK reference trap
+**Agent:** Anvil Developer
+**Plan step:** Step 1B5 — chunk_type CHECK constraint migration.
+**What happened:** The migration creates `code_chunks_new` with a self-referencing FK (`parent_chunk_id REFERENCES code_chunks_new(id)`), then renames to `code_chunks`. SQLite preserves the FK text literally — after rename, the FK still references `code_chunks_new`, which no longer exists. Any subsequent UPDATE that triggers FK validation fails with `no such table: main.code_chunks_new`. Fixed by referencing `code_chunks(id)` in the new table definition (valid because `PRAGMA foreign_keys=OFF` during migration).
+**Recommendation:** When using the SQLite table-recreation migration pattern (create new → copy data → drop old → rename), always reference the FINAL table name in FK constraints, not the temporary name. `PRAGMA foreign_keys=OFF` prevents validation during creation, and after rename the FK points to the correct table.
+
+
+### 2026-06-09 — BP3 QA: Classify-only hash row scope mismatch
+**Agent:** Anvil QA Analyst
+**Plan step:** Step 2 Check 1 — invoice-pulse classify-identity regression gate.
+**What happened:** Initial classify-only hash computation used `chunk_type IN ('function','method','class')` (1990 rows), which is the classifiable chunk filter, not the same scope as the BP2 regression harness. The BP2 harness joins `code_chunks` with `health_scores` (3688 rows), including module/test_case/config chunks. The classify-only hash must use the same row set as the original harness (just dropping composite_score from the hash).
+**Recommendation:** When adapting a regression harness for classify-only mode, preserve the original row scope exactly — only change which columns are hashed, not which rows are included.
