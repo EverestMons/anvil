@@ -7,6 +7,7 @@ ingests recent git history for volatility tracking.
 """
 from __future__ import annotations
 
+import glob
 import hashlib
 import logging
 import os
@@ -19,6 +20,7 @@ from src import db
 from src.config import (
     ANVIL_DB_PATH,
     ANVIL_ROOT,
+    BACKUP_RETENTION_COUNT,
     EXCLUDED_DIRS,
     EXCLUDED_EXTENSIONS,
     GIT_HISTORY_WEEKS,
@@ -130,6 +132,7 @@ def prune_deleted_file_orphans(conn, project_id: int,
     if os.path.isfile(ANVIL_DB_PATH):
         shutil.copy2(ANVIL_DB_PATH, backup_path)
         logging.info("Pre-prune backup created: %s", backup_path)
+        _prune_old_backups(backup_dir, BACKUP_RETENTION_COUNT)
 
     placeholders = ",".join(["?"] * len(orphan_fps))
     cur = conn.execute(
@@ -175,6 +178,20 @@ def prune_deleted_file_orphans(conn, project_id: int,
         "pruned_modules": module_count,
         "pruned_children": child_count,
     }
+
+
+def _prune_old_backups(backup_dir: str, keep: int) -> list[str]:
+    """Delete all but the *keep* most recent anvil-backup-*.db files."""
+    if not os.path.isdir(backup_dir):
+        return []
+    backups = sorted(glob.glob(os.path.join(backup_dir, "anvil-backup-*.db")))
+    if len(backups) <= keep:
+        return []
+    to_delete = backups[: len(backups) - keep]
+    for path in to_delete:
+        os.remove(path)
+        logging.info("Retention: deleted old backup %s", path)
+    return to_delete
 
 
 def compute_file_hash(file_path: str) -> Optional[str]:

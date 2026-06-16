@@ -58,6 +58,9 @@ EXCLUDED_EXTENSIONS = {
     ".eot",
 }
 
+# Cap backups/ to the N most recent snapshots
+BACKUP_RETENTION_COUNT = 3
+
 MINHASH_NUM_PERM = 128
 MINHASH_THRESHOLD = 0.7
 GIT_HISTORY_WEEKS = 4
