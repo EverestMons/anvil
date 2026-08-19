@@ -1,0 +1,1 @@
+grep -nF 'tests/' returned 0 matches — no test-file findings in audit-findings file. This is the expected result (no tests/ entries in finding file_path fields).

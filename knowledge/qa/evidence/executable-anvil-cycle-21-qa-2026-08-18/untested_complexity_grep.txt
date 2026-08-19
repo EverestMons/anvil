@@ -1,0 +1,4 @@
+Plan grep target (audit-findings file): no match — section is NOT in the audit-findings file.
+
+Section found in cycle report (correct location):
+45:## Untested Complexity (top-20 by coverage × complexity)
