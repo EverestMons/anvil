@@ -35,6 +35,6 @@ Execute investigation, deposit findings to `knowledge/research/`. Move to Done (
 3. **Commit messages follow conventional commits:** `feat:`, `fix:`, `docs:`, `chore:`, `test:`
 4. **Never modify files outside the anvil directory without explicit CEO approval.**
 5. **Read your specialist file at `anvil/agents/` before starting any task.**
-6. **Read the domain glossary at `anvil/knowledge/research/domain-glossary.md`** for Anvil-specific terminology.
+6. **Read your project's tagged entries in the central glossary at `/Users/marklehn/Developer/GitHub/GLOSSARY.md` (`[project: anvil]`)** for Anvil-specific terminology.
 7. **Python 3.x, SQLite, no external API dependencies** — Claude Code is the intelligence layer.
 8. **All knowledge deposits use `with open()` with absolute paths.**
