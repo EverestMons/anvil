@@ -3,20 +3,22 @@ Anvil configuration — paths, scan targets, and tuning parameters.
 """
 import os
 
-ANVIL_ROOT = "/Users/marklehn/Developer/GitHub/anvil"
-
 ANVIL_RUNTIME_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+ANVIL_ROOT = os.environ.get("ANVIL_ROOT", ANVIL_RUNTIME_ROOT)
+
+PROJECTS_PARENT = os.environ.get("ANVIL_PROJECTS_PARENT", os.path.dirname(ANVIL_RUNTIME_ROOT))
 
 ANVIL_DB_PATH = os.path.join(ANVIL_ROOT, "anvil.db")
 
 SCAN_TARGETS = {
     "invoice-pulse": {
-        "path": "/Users/marklehn/Developer/GitHub/invoice-pulse",
+        "path": os.path.join(PROJECTS_PARENT, "invoice-pulse"),
         "language": "python",
         "archetype": "flask_service",
     },
     "bellows": {
-        "path": "/Users/marklehn/Developer/GitHub/bellows",
+        "path": os.path.join(PROJECTS_PARENT, "bellows"),
         "language": "python",
         "archetype": "daemon",
     },

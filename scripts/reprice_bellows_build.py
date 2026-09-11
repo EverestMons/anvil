@@ -11,15 +11,14 @@ import sys, os, sqlite3, time, argparse
 ANVIL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ANVIL_ROOT)
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--checkout", default="/Users/marklehn/Developer/bellows")
-    ap.add_argument("--tmp", default=None, help="Temp dir for DB; must be under /tmp or $TMPDIR")
-    args = ap.parse_args()
 
-    tmp_root = args.tmp or os.environ.get("TMPDIR", "/tmp")
+def build_scratch_db(checkout, tmp_root):
+    """
+    Build a scratch anvil DB over the given checkout. Returns the DB path.
+    tmp_root must be under a temp dir (/tmp, $TMPDIR, /private/tmp).
+    READ-ONLY over the checkout. Writers never called by name.
+    """
     db_path = os.path.join(tmp_root, "anvil-scratch.db")
-    # Assert DB path is under a temp dir — the guard the plan requires
     allowed = ["/tmp", os.environ.get("TMPDIR", "/tmp"), "/private/tmp"]
     if not any(os.path.realpath(db_path).startswith(os.path.realpath(a)) for a in allowed if a):
         raise RuntimeError(f"DB path {db_path!r} is not under a temp dir — refusing to write")
@@ -27,7 +26,7 @@ def main():
     import src.config as cfg
     cfg.ANVIL_ROOT = tmp_root
     cfg.ANVIL_DB_PATH = db_path
-    cfg.SCAN_TARGETS["bellows"]["path"] = args.checkout
+    cfg.SCAN_TARGETS["bellows"]["path"] = checkout
     import src.scanner as sc
     sc.ANVIL_ROOT = tmp_root
     sc.ANVIL_DB_PATH = db_path
@@ -66,6 +65,17 @@ def main():
     print("top inbound (prod):", q("""select c.file_path||'::'||c.name, count(*) n from chunk_dependencies d join code_chunks c on c.id=d.target_chunk_id
  where c.project_id=? and d.scope='cross_file' and c.chunk_type in ('function','method','class') group by 1 order by n desc limit 12""", pid))
     print(f"DB written to: {db_path}")
+    return db_path
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--checkout", default="/Users/marklehn/Developer/bellows")
+    ap.add_argument("--tmp", default=None, help="Temp dir for DB; must be under /tmp or $TMPDIR")
+    args = ap.parse_args()
+    tmp_root = args.tmp or os.environ.get("TMPDIR", "/tmp")
+    build_scratch_db(args.checkout, tmp_root)
+
 
 if __name__ == "__main__":
     main()
