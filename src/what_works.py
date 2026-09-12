@@ -143,22 +143,22 @@ def production_defs(checkout):
     return defs
 
 
-def verified_inbound(conn, checkout, defs):
+def verified_callers(conn, checkout, defs):
     """
-    Return dict mapping 'file::name' -> verified inbound call count.
-    Verified: cross-file call edge in chunk_dependencies whose caller's file,
-    read at HEAD, imports the target's module. path_loaded edges are not counted
-    as verified (but are tracked in path_loaded_counts separately).
-    Only defs that appear in the DB (matched by file_path + name) are counted.
+    Return dict mapping 'file::name' -> list of verified caller labels, one per
+    verified cross-file call edge in query row order (duplicates kept — a caller
+    with N call sites appears N times, so len(list) is the edge count).
+    Label: 'file (module)' for module chunks, 'file::name' otherwise.
     """
-    # Build a lookup: (file_path, name) -> key
     def_keys = {(d["file"], d["name"]): f"{d['file']}::{d['name']}" for d in defs}
-    counts = {key: 0 for key in def_keys.values()}
+    labels = {key: [] for key in def_keys.values()}
 
     rows = conn.execute("""
-        SELECT src_c.file_path AS caller_file,
-               tgt_c.file_path AS target_file,
-               tgt_c.name      AS target_name
+        SELECT src_c.file_path  AS caller_file,
+               src_c.name       AS caller_name,
+               src_c.chunk_type AS src_chunk_type,
+               tgt_c.file_path  AS target_file,
+               tgt_c.name       AS target_name
           FROM chunk_dependencies d
           JOIN code_chunks tgt_c ON tgt_c.id = d.target_chunk_id
           JOIN code_chunks src_c ON src_c.id = d.source_chunk_id
@@ -166,10 +166,9 @@ def verified_inbound(conn, checkout, defs):
            AND d.scope = 'cross_file'
     """).fetchall()
 
-    # Cache source texts to avoid re-reading the same file repeatedly
     _source_cache = {}
 
-    for caller_file, target_file, target_name in rows:
+    for caller_file, caller_name, src_chunk_type, target_file, target_name in rows:
         key = def_keys.get((target_file, target_name))
         if key is None:
             continue
@@ -185,9 +184,24 @@ def verified_inbound(conn, checkout, defs):
         target_module = _module_from_path(target_file)
         verified, _ = _check_import(source, target_module, target_name, caller_file)
         if verified:
-            counts[key] += 1
+            if src_chunk_type == "module":
+                label = f"{caller_file} (module)"
+            else:
+                label = f"{caller_file}::{caller_name}"
+            labels[key].append(label)
 
-    return counts
+    return labels
+
+
+def verified_inbound(conn, checkout, defs):
+    """
+    Return dict mapping 'file::name' -> verified inbound call count.
+    Verified: cross-file call edge in chunk_dependencies whose caller's file,
+    read at HEAD, imports the target's module. path_loaded edges are not counted
+    as verified (but are tracked in path_loaded_counts separately).
+    Only defs that appear in the DB (matched by file_path + name) are counted.
+    """
+    return {key: len(labels) for key, labels in verified_callers(conn, checkout, defs).items()}
 
 
 def survived(checkout, defs, today, conn=None):
@@ -316,22 +330,7 @@ def entry(conn, checkout, row):
     file_path = row["file"]
     name = row["name"]
 
-    # Verified callers from chunk_dependencies — exclude module-level chunks
-    # (whose name contains '/' because anvil stores them as file-path strings)
-    callers = conn.execute("""
-        SELECT DISTINCT src_c.file_path || '::' || src_c.name AS caller
-          FROM chunk_dependencies d
-          JOIN code_chunks src_c ON src_c.id = d.source_chunk_id
-          JOIN code_chunks tgt_c ON tgt_c.id = d.target_chunk_id
-         WHERE d.dependency_type = 'call'
-           AND d.scope = 'cross_file'
-           AND tgt_c.file_path = ?
-           AND tgt_c.name = ?
-           AND src_c.name NOT LIKE '%/%'
-         ORDER BY caller
-         LIMIT 3
-    """, (file_path, name)).fetchall()
-    callers_list = [r[0] for r in callers]
+    callers_list = sorted(set(row.get("verified_callers", [])))[:3]
     verified_count = row.get("score_a", 0)
 
     # Test bindings

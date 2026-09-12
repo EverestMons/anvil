@@ -113,7 +113,7 @@ def main():
     conn.execute("PRAGMA foreign_keys=ON")
 
     from src.what_works import (
-        production_defs, verified_inbound, survived, rank,
+        production_defs, verified_callers, survived, rank,
         precision_recall, entry, render_markdown, render_tsv,
         ROLE_WEIGHTS,
     )
@@ -122,12 +122,13 @@ def main():
 
     # --- Score ---
     defs = production_defs(checkout)
-    vi = verified_inbound(conn, checkout, defs)
+    vc = verified_callers(conn, checkout, defs)
 
     surv_rows = survived(checkout, defs, today, conn=conn)
     for row in surv_rows:
         key = f"{row['file']}::{row['name']}"
-        row["score_a"] = vi.get(key, 0)
+        row["score_a"] = len(vc.get(key, []))
+        row["verified_callers"] = vc.get(key, [])
         role_row = conn.execute(
             "SELECT functional_role FROM code_chunks WHERE file_path=? AND name=? LIMIT 1",
             (row["file"], row["name"]),

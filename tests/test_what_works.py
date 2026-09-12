@@ -340,3 +340,164 @@ def test_build_scratch_db_importable():
     assert hasattr(mod, "build_scratch_db"), "build_scratch_db not found"
     assert callable(mod.build_scratch_db)
     assert callable(mod.main)
+
+
+# ---------------------------------------------------------------------------
+# t13: verified_callers — root-level module caller gets "(module)" label
+# ---------------------------------------------------------------------------
+
+def test_verified_callers_module_caller_label(conn, tmp_path):
+    from src.what_works import production_defs, verified_callers, verified_inbound
+    _make_git_repo(tmp_path)
+    (tmp_path / "b.py").write_text("def f():\n    pass\n")
+    (tmp_path / "a.py").write_text("import b\nb.f()\n")
+    _git_commit(tmp_path, "init")
+
+    pid = create_project(conn, "test", str(tmp_path))
+    b_f = create_chunk(
+        conn, project_id=pid, file_path="b.py", chunk_type="function",
+        name="f", content="def f():\n    pass", content_hash="h1",
+        start_line=1, end_line=2,
+    )
+    a_mod = create_chunk(
+        conn, project_id=pid, file_path="a.py", chunk_type="module",
+        name="a.py", content="import b\nb.f()", content_hash="h2",
+        start_line=1, end_line=2,
+    )
+    create_dependency(conn, a_mod, b_f, "call", "cross_file")
+
+    defs = production_defs(str(tmp_path))
+    vc = verified_callers(conn, str(tmp_path), defs)
+    vi = verified_inbound(conn, str(tmp_path), defs)
+    assert vc.get("b.py::f") == ["a.py (module)"]
+    assert vi.get("b.py::f") == 1
+
+
+# ---------------------------------------------------------------------------
+# t14: entry — sample agrees with count (method target, module caller)
+# ---------------------------------------------------------------------------
+
+def test_entry_sample_agrees_with_count_on_method_target(conn, tmp_path):
+    from src.what_works import entry, verified_callers, verified_inbound
+    _make_git_repo(tmp_path)
+    (tmp_path / "b.py").write_text("class C:\n    def m(self): pass\n")
+    (tmp_path / "a.py").write_text("import b\n\ndef caller():\n    b.C().m()\n")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "t_b.py").write_text("import b\nb.C().m()\nb.C().m()\n")
+    _git_commit(tmp_path, "init")
+
+    pid = create_project(conn, "test", str(tmp_path))
+    b_m = create_chunk(
+        conn, project_id=pid, file_path="b.py", chunk_type="method",
+        name="m", content="def m(self): pass", content_hash="h1",
+        start_line=2, end_line=2,
+    )
+    a_caller = create_chunk(
+        conn, project_id=pid, file_path="a.py", chunk_type="function",
+        name="caller", content="def caller():\n    b.C().m()", content_hash="h2",
+        start_line=3, end_line=4,
+    )
+    t_mod = create_chunk(
+        conn, project_id=pid, file_path="tests/t_b.py", chunk_type="module",
+        name="tests/t_b.py", content="import b\nb.C().m()\nb.C().m()", content_hash="h3",
+        start_line=1, end_line=3,
+    )
+    create_dependency(conn, a_caller, b_m, "call", "cross_file")
+    create_dependency(conn, t_mod, b_m, "call", "cross_file")
+    create_dependency(conn, t_mod, b_m, "call", "cross_file")
+
+    defs_b_m = [{"file": "b.py", "name": "m"}]
+    vc = verified_callers(conn, str(tmp_path), defs_b_m)
+    vi = verified_inbound(conn, str(tmp_path), defs_b_m)
+    assert vi["b.py::m"] == 3
+    callers_list = vc["b.py::m"]
+    assert len(callers_list) == 3
+    assert callers_list.count("tests/t_b.py (module)") == 2
+
+    row = {
+        "file": "b.py", "name": "m", "score_a": 3,
+        "verified_callers": callers_list,
+    }
+    e = entry(conn, str(tmp_path), row)
+    assert e["verified_callers_sample"] == ["a.py::caller", "tests/t_b.py (module)"]
+    assert len(e["verified_callers_sample"]) == min(2, 3)
+
+
+# ---------------------------------------------------------------------------
+# t15: entry — sample capped at three with four distinct callers
+# ---------------------------------------------------------------------------
+
+def test_entry_sample_capped_at_three(conn, tmp_path):
+    from src.what_works import entry, verified_callers
+    _make_git_repo(tmp_path)
+    (tmp_path / "b.py").write_text("def f():\n    pass\n")
+    for i in range(1, 5):
+        (tmp_path / f"a{i}.py").write_text(
+            f"import b\n\ndef caller{i}():\n    b.f()\n"
+        )
+    _git_commit(tmp_path, "init")
+
+    pid = create_project(conn, "test", str(tmp_path))
+    b_f = create_chunk(
+        conn, project_id=pid, file_path="b.py", chunk_type="function",
+        name="f", content="def f():\n    pass", content_hash="h0",
+        start_line=1, end_line=2,
+    )
+    caller_ids = []
+    for i in range(1, 5):
+        c = create_chunk(
+            conn, project_id=pid, file_path=f"a{i}.py", chunk_type="function",
+            name=f"caller{i}", content=f"def caller{i}():\n    b.f()",
+            content_hash=f"h{i}", start_line=3, end_line=4,
+        )
+        caller_ids.append(c)
+        create_dependency(conn, c, b_f, "call", "cross_file")
+
+    defs = [{"file": "b.py", "name": "f"}]
+    vc = verified_callers(conn, str(tmp_path), defs)
+    callers_list = vc["b.py::f"]
+    assert len(callers_list) == 4
+
+    row = {"file": "b.py", "name": "f", "score_a": 4, "verified_callers": callers_list}
+    e = entry(conn, str(tmp_path), row)
+    assert len(e["verified_callers_sample"]) == 3
+
+
+# ---------------------------------------------------------------------------
+# t16: verified_inbound is len of verified_callers — values asserted
+# ---------------------------------------------------------------------------
+
+def test_verified_inbound_is_len_of_callers(conn, tmp_path):
+    from src.what_works import verified_callers, verified_inbound
+    _make_git_repo(tmp_path)
+    (tmp_path / "b.py").write_text("def f():\n    pass\n")
+    (tmp_path / "a.py").write_text(
+        "import b\n\ndef caller():\n    b.f()\n"
+    )
+    (tmp_path / "c.py").write_text("def caller2():\n    f()\n")
+    _git_commit(tmp_path, "init")
+
+    pid = create_project(conn, "test", str(tmp_path))
+    b_f = create_chunk(
+        conn, project_id=pid, file_path="b.py", chunk_type="function",
+        name="f", content="def f():\n    pass", content_hash="h1",
+        start_line=1, end_line=2,
+    )
+    a_caller = create_chunk(
+        conn, project_id=pid, file_path="a.py", chunk_type="function",
+        name="caller", content="def caller():\n    b.f()", content_hash="h2",
+        start_line=3, end_line=4,
+    )
+    c_caller = create_chunk(
+        conn, project_id=pid, file_path="c.py", chunk_type="function",
+        name="caller2", content="def caller2():\n    f()", content_hash="h3",
+        start_line=1, end_line=2,
+    )
+    create_dependency(conn, a_caller, b_f, "call", "cross_file")
+    create_dependency(conn, c_caller, b_f, "call", "cross_file")
+
+    defs = [{"file": "b.py", "name": "f"}]
+    vc = verified_callers(conn, str(tmp_path), defs)
+    vi = verified_inbound(conn, str(tmp_path), defs)
+    assert vc["b.py::f"] == ["a.py::caller"]
+    assert vi == {"b.py::f": 1}
